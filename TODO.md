@@ -4,7 +4,6 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Test suite**: one command that launches a test profile and checks the key behaviors (rows and folders survive a restart, the Cmd+T bar, closing rules, spacing), to catch regressions and LibreWolf-update breakage.
 - [ ] **Multiple windows**: other windows don't show your tiles, pinned rows and folders (tiles are per-window LibreWolf pinned tabs; rows are restored only in the first window). In Arc every window shows the same ones.
 
 ## Later
@@ -26,6 +25,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Test suite (`python3 tests/run_tests.py`). It found fresh installs fitting only 2 tiles per row: fixed (the sidebar's contents now always fill it).
 - [x] Video fullscreen fills the screen (no page-card gutter, corners or shadow).
 - [x] Accessibility: the sidebar button and the pinned-page dot have proper names for VoiceOver.
 - [x] Command bar screenshot with suggestions (a macOS capture: LibreWolf's own snapshot doesn't draw the suggestion list).

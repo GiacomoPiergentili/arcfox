@@ -99,6 +99,14 @@ The script keeps its state in prefs and session data: pinned rows and folders in
 
 Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
 
+## Tests
+
+```bash
+python3 tests/run_tests.py
+```
+
+Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, rows and folders across a restart, and auto-archive. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
+
 ## What's been done
 
 Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
@@ -119,6 +127,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 
 12. **Screenshots and license**: README screenshots (dark, light, command bar, auto-hide); MIT license.
 13. **Auto-hide sidebar color**: measured from the pinned sidebar on theme, appearance and wallpaper changes (`arc.sidebarColor.dark` / `.light`).
+14. **Video fullscreen, accessibility, tests**: videos fill the screen; the custom buttons have VoiceOver names; a regression test suite, which right away caught fresh installs fitting only 2 tiles per row (the sidebar's contents were narrower than the sidebar until its edge was dragged once).
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

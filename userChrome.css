@@ -110,6 +110,10 @@
 
 sidebar-main {
   --focus-outline-color: transparent !important;
+  /* The sidebar's contents fill it. Until its edge is dragged once,
+     LibreWolf sized them from a width of its own (narrower than the sidebar:
+     a fresh profile fit only 2 tiles per row, with empty space at the right) */
+  --sidebar-expanded-launcher-width: 100% !important;
 }
 
 #vertical-tabs {
