@@ -8,7 +8,7 @@ Nothing queued: pick from "Later" or "Bigger projects".
 
 ## Later
 
-- [ ] **Command bar screenshot with suggestions**: LibreWolf's own snapshot doesn't render the suggestion list, so the README shows the empty bar.
+Nothing queued.
 
 ## Bigger projects
 
@@ -25,6 +25,7 @@ Nothing queued: pick from "Later" or "Bigger projects".
 
 ## Done
 
+- [x] Command bar screenshot with suggestions (a macOS capture: LibreWolf's own snapshot doesn't draw the suggestion list).
 - [x] The auto-hide sidebar measures the pinned sidebar's color itself (at launch, on theme and light/dark changes, when the window becomes active, when the sidebar gets pinned), so it matches with any theme or wallpaper.
 - [x] Fixed: a quick Cmd+T right after Enter was ignored, and the bar could fill with the previous tab's address while it loaded.
 - [x] README screenshots (dark, light, command bar, auto-hide) and an MIT license.

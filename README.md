@@ -8,7 +8,7 @@ LibreWolf's native vertical tabs become an Arc sidebar: the toolbar and URL bar 
 
 | Light mode | Cmd+T command bar | Auto-hide sidebar |
 |---|---|---|
-| ![The sidebar in light mode](docs/screenshots/sidebar-light.png) | ![The floating command bar over a page](docs/screenshots/command-bar.png) | ![The auto-hide sidebar floating over a page](docs/screenshots/auto-hide.png) |
+| ![The sidebar in light mode](docs/screenshots/sidebar-light.png) | ![The floating command bar with suggestions: a search, and an open tab to switch to](docs/screenshots/command-bar.png) | ![The auto-hide sidebar floating over a page](docs/screenshots/auto-hide.png) |
 
 It's two pieces:
 
