@@ -1750,3 +1750,16 @@ split-view-footer {
   }
 }
 
+/* ---------- Start-up ----------
+   While a window starts, its tab list is hidden ([arc-starting], set by the
+   shortcut script before the window is shown) until its tiles, rows,
+   folders and start page are in place; then it fades in. Without the
+   script nothing is hidden. */
+#tabbrowser-tabs {
+  transition: opacity 150ms ease-out;
+}
+
+:root[arc-starting] #tabbrowser-tabs {
+  opacity: 0;
+  transition: none;
+}

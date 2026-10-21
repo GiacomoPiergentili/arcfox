@@ -393,6 +393,8 @@ check(gBrowser.selectedTab.hasAttribute("arc-start-page"), "launch starts on the
 // (the bar itself only stays open in a window that's in front, which the
 // test window isn't: it closes as soon as the URL bar can't hold the focus)
 check(rows().every(r => r.hasAttribute("pending")), "rows come back unloaded");
+check(tiles().every(t => t.hasAttribute("pending")), "tiles come back unloaded too (they load when opened)");
+check(!root.hasAttribute("arc-starting") && getComputedStyle(gBrowser.tabContainer).opacity === "1", "the tab list is shown once start-up is done");
 newTabKey(); await wait(300);
 return result({rows: names});
 """),

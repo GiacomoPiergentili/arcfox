@@ -31,6 +31,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Start-up: tiles load when opened; the tab list fades in complete instead of popping in (no stray "New Tab" row, blank tiles or late icons).
 - [x] Peek motion: the card grows out of the clicked link once its page has drawn and shrinks back on close; no black frames (the page underneath is kept drawn), no empty card.
 - [x] Option+click a link in any tab opens it in Peek (as in Zen).
 - [x] Peek: links to other sites from tiles and pinned rows open in a card over the dimmed pinned page (Esc / click outside / Cmd+W / switching tabs close it; Open as Tab; Split View from a row).

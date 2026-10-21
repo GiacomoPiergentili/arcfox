@@ -33,6 +33,26 @@ try {
     // Auto-archive (see below): hours a normal tab may stay unused; 0 = off
     const ARCHIVE_PREF = "arc.archiveAfterHours";
     defaults.setIntPref(ARCHIVE_PREF, 24);
+    // Tiles load when first opened, like the pinned rows: loading every
+    // tile's page at launch made start-up slow and busy (and left the tiles
+    // blank while they loaded)
+    defaults.setBoolPref("browser.sessionstore.restore_pinned_tabs_on_demand", true);
+
+    // A starting window's tab list stays hidden ([arc-starting]) until its
+    // tiles, rows, folders and start page are in place, then fades in:
+    // otherwise they popped in one by one (a stray "New Tab" row, blank
+    // tiles, icons arriving late). Set before the window is first shown;
+    // cleared by the window's own set-up below, or after 4s whatever happens.
+    obs.addObserver(win => {
+      try {
+        if (win.toolbar?.visible === false) {
+          return;
+        }
+        const root = win.document.documentElement;
+        root.setAttribute("arc-starting", "");
+        win.setTimeout(() => root.removeAttribute("arc-starting"), 4000);
+      } catch {}
+    }, "browser-window-before-show");
 
     // Option+click on a link in a page opens it in Peek, from any tab (as in
     // Zen). LibreWolf does nothing with it otherwise (no navigation, no
@@ -2724,6 +2744,13 @@ try {
           }, 0));
         }
       }
+
+      // Everything's in place (rows and folders restored or synced, the
+      // start page marked: those run on the same signal, earlier): the tab
+      // list fades in (see "browser-window-before-show" above)
+      SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => doc.documentElement.removeAttribute("arc-starting")));
+      }, 0));
     }, "browser-delayed-startup-finished");
   })();
 } catch (e) {
