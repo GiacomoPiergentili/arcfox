@@ -24,6 +24,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Done
 
+- [x] Fixed: a quick Cmd+T right after Enter was ignored, and the bar could fill with the previous tab's address while it loaded.
 - [x] README screenshots (dark, light, command bar, auto-hide) and an MIT license.
 - [x] Light mode pass (Nova Ash): auto-hide sidebar color fixed for light mode; + New Tab text in the rows' color.
 - [x] Auto-archive: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`, 0 = off).

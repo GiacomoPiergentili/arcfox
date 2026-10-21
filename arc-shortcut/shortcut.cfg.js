@@ -1322,9 +1322,8 @@ try {
         const gURLBar = win.gURLBar;
         if (newTabCommands.length && gURLBar?.controller) {
           const barOpen = () => root.hasAttribute("arc-newtab-bar");
-          let startTab = null;
           let closeTimer = null;
-          let closedAt = -1000;
+          let blurClosedAt = -1000; // when the bar last closed because focus left it
           let loading = false;
           const closeBar = () => {
             win.clearTimeout(closeTimer);
@@ -1337,22 +1336,18 @@ try {
             root.setAttribute("arc-newtab-closing", "");
             win.requestAnimationFrame(() => win.requestAnimationFrame(() =>
               root.removeAttribute("arc-newtab-closing")));
-            closedAt = win.performance.now();
             // After Enter, LibreWolf handles the address and the focus
             if (!loading) {
               if (gURLBar.focused) {
                 gBrowser.selectedBrowser.focus();
               }
-              // Nothing was opened: show the current page's address again
-              if (gBrowser.selectedTab === startTab) {
-                gURLBar.handleRevert();
-              }
+              // Nothing was opened, or another tab was picked: show the
+              // current tab's address (held back while the bar was open)
+              gURLBar.handleRevert();
             }
-            startTab = null;
             loading = false;
           };
           const openBar = () => {
-            startTab = gBrowser.selectedTab;
             root.setAttribute("arc-newtab-bar", "");
             gURLBar.focus();
             gURLBar.value = "";
@@ -1364,17 +1359,37 @@ try {
           // (on the command set), which would open a tab
           const toggleBar = e => {
             e.stopPropagation();
+            // A click on + New Tab while the bar is open may already have
+            // closed it by taking the focus: that click means "close". Only
+            // then (a keyboard Cmd+T right after Enter or Esc always opens).
+            // (a click comes from the + New Tab button, a key press from its
+            // key; LibreWolf doesn't reliably say which input it was, so look
+            // at what sent the command, through the chain of source events)
+            let byMouse = false;
+            for (let ev = e, depth = 0; ev && depth < 4; ev = ev.sourceEvent, depth++) {
+              if (ev.target?.localName === "toolbarbutton" || /^(mouse|click|pointer)/.test(ev.type)) {
+                byMouse = true;
+              }
+            }
             if (barOpen()) {
               closeBar();
-            } else if (win.performance.now() - closedAt > 300) {
-              // (a click on + New Tab while the bar was open may have closed
-              // it already by taking the focus; that press means "close")
+            } else if (!byMouse || win.performance.now() - blurClosedAt > 300) {
               openBar();
             }
           };
           for (const command of newTabCommands) {
             command.addEventListener("command", toggleBar);
           }
+          // While the bar is open, LibreWolf's address updates (e.g. the tab
+          // opened by the previous Enter finishing its load) would fill the
+          // empty bar with that tab's address: they wait until it closes
+          const setURI = gURLBar.setURI.bind(gURLBar);
+          gURLBar.setURI = (...args) => {
+            if (barOpen()) {
+              return undefined;
+            }
+            return setURI(...args);
+          };
           // Enter loads in a new tab (an empty current tab is still reused)
           const controller = gURLBar.controller;
           const whereToOpen = controller.whereToOpen.bind(controller);
@@ -1413,6 +1428,7 @@ try {
               closeTimer = win.setTimeout(() => {
                 closeTimer = null;
                 if (!editInProgress()) {
+                  blurClosedAt = win.performance.now();
                   closeBar();
                 }
               }, END_DELAY_MS);
