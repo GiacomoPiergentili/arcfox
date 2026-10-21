@@ -1,0 +1,7 @@
+# Local backups of earlier versions (git history replaces them)
+arc-shortcut/backups/
+
+# LibreWolf's own config, saved before the first install (not part of this project)
+arc-shortcut/librewolf.cfg.original-backup
+
+.DS_Store

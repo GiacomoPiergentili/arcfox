@@ -1,0 +1,1320 @@
+/* =====================================================================
+   Arc-style LibreWolf, styled after macOS (one spacing rhythm, one set of
+   radii, fills and shadows, defined below)
+   Requires: native vertical tabs (sidebar.verticalTabs = true) and, for the
+   behavior (rows, tiles, Cmd+T bar, ...), arc-shortcut/install.sh
+   Restart LibreWolf (Cmd+Q) after editing.
+   ===================================================================== */
+
+/* ---------- Tweak me ---------- */
+:root {
+  --arc-gap: 8px;          /* space around the page card */
+  /* Distance of everything in the sidebar (URL bar, pinned tiles, tabs) from
+     the sidebar's edges: the same step as the gap around the page */
+  --arc-sidebar-inset: var(--arc-gap);
+  --arc-tab-height: 32px;  /* sidebar row height (macOS medium is 28px; a bit of air for long tab lists) */
+  --arc-tab-gap: 4px;      /* space between tab rows */
+  --arc-tab-font-size: 13px;  /* macOS sidebar text size */
+  --arc-pinned-min-width: 72px;  /* pinned tile minimum width: 3 per row at 260px */
+  --arc-pinned-tile-height: 40px;  /* even, so the icon sits on a whole pixel */
+  --arc-tile-gap: 8px;     /* space between tiles, both ways */
+
+  /* One corner radius for every large surface (page card, URL bars, hover
+     panel); things inside them use the same curve minus the gap, so all
+     corners nest evenly. */
+  --arc-radius: 12px;
+  --arc-radius-inner: calc(var(--arc-radius) - 4px);  /* tabs, buttons */
+
+  /* Colors, macOS-style: neutral fills at low opacity, a hairline instead of
+     borders, and the system accent color (System Settings > Appearance)
+     only for focus. Each is a light/dark pair. */
+  --arc-hairline: light-dark(rgba(0, 0, 0, 0.10), rgba(255, 255, 255, 0.10));
+  --arc-fill-hover: light-dark(rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.06));
+  --arc-fill-selected: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.11));
+  --arc-field: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.07));
+  --arc-field-focus: light-dark(rgb(255, 255, 255), rgba(255, 255, 255, 0.11));
+  /* Tiles rest on a fill of their own, so their hover is a step lighter */
+  --arc-fill-tile: var(--arc-field);
+  --arc-fill-tile-hover: light-dark(rgba(0, 0, 0, 0.09), rgba(255, 255, 255, 0.13));
+  --arc-panel: light-dark(rgb(246, 246, 246), rgb(42, 42, 44));  /* opaque: no blur is possible */
+  --arc-label-secondary: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.55));
+  --arc-focus: AccentColor;  /* selection: highlighted rows and menu items */
+  /* Focus ring: macOS draws it with the accent at about half strength,
+     lighter than a selection (as Safari's address bar does) */
+  --arc-focus-ring: color-mix(in srgb, AccentColor 55%, transparent);
+
+  /* One shadow family, lit from above: resting -> raised -> floating.
+     The hairline ring keeps edges visible in dark mode too. */
+  --arc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--arc-hairline);
+  --arc-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px var(--arc-hairline);
+  --arc-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--arc-hairline);
+
+  /* LibreWolf's purple accent -> the system accent (checkboxes, toggles,
+     primary buttons) and the softer accent for focus rings */
+  --color-accent-primary: var(--arc-focus) !important;
+  --focus-outline-color: var(--arc-focus-ring) !important;
+
+  /* Fields (URL bar, find bar, ...) */
+  --toolbar-field-background-color: var(--arc-field) !important;
+  --toolbar-field-focus-background-color: var(--arc-field-focus) !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-border-color-focus: var(--arc-focus-ring) !important;
+}
+
+:root {
+  --tab-border-radius: var(--arc-radius-inner) !important;
+  --tab-min-height: var(--arc-tab-height) !important;
+  --toolbarbutton-border-radius: var(--arc-radius-inner) !important;
+}
+
+/* The toolbar floats over the top of the sidebar (see below), so it must not
+   paint its own background or it shows up as a separate block */
+#navigator-toolbox,
+#nav-bar {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Hide the leftover horizontal tab strip when using vertical tabs */
+:root:has(#tabbrowser-tabs[orient="vertical"]) #TabsToolbar {
+  visibility: collapse !important;
+}
+
+/* ---------- Top toolbar ---------- */
+/* Hide the noisier URL bar bits (re-show any you miss) */
+#tracking-protection-icon-container,
+#pageActionButton,
+#reader-mode-button {
+  display: none !important;
+}
+
+/* ---------- Sidebar ---------- */
+/* The padding goes on the inner element, not #sidebar-container: LibreWolf's
+   hover check uses the inner element's box, and padding outside it left a
+   4px dead zone at the screen edge (in fullscreen the sidebar closed itself
+   whenever the pointer rested against the edge). */
+#sidebar-container > sidebar-main {
+  box-sizing: border-box !important;
+  padding-inline: 4px !important;
+}
+
+/* Resize handles (below the pinned tabs, above the sidebar's bottom
+   buttons): macOS dividers show only the resize cursor, not a colored bar.
+   The second one is inside a component and paints its hover with
+   --focus-outline-color, so that variable is cleared for the sidebar and
+   restored for the tabs. */
+#vertical-pinned-tabs-splitter:hover {
+  background-color: transparent !important;
+}
+
+sidebar-main {
+  --focus-outline-color: transparent !important;
+}
+
+#vertical-tabs {
+  --focus-outline-color: var(--arc-focus-ring) !important;
+}
+
+/* Hide the splitter line between sidebar and page */
+#sidebar-launcher-splitter,
+#sidebar-splitter {
+  border: none !important;
+  background: transparent !important;
+  width: var(--arc-gap) !important;
+  min-width: var(--arc-gap) !important;
+}
+
+/* The page card sits 8px from the sidebar's content, as on its other sides
+   (the handle covers the sidebar's empty right padding instead) */
+#sidebar-launcher-splitter {
+  margin-inline-start: calc(-1 * var(--arc-gap)) !important;
+}
+
+/* ---------- Tabs as pills ---------- */
+/* A tight list like Finder/Safari sidebars: rows separated only by
+   --arc-tab-gap (LibreWolf adds a grid gap plus padding on each row) */
+#tabbrowser-tabs[orient="vertical"] {
+  grid-gap: 0 !important;
+  --tab-padding-block-start: calc(var(--arc-tab-gap) / 2) !important;
+  --tab-padding-block-end: calc(var(--arc-tab-gap) / 2) !important;
+  --tab-margin-block: 0px !important;
+  /* LibreWolf derives this from the row height (to center icons in the
+     collapsed sidebar); fixed, so icons stay in one column (12px from the
+     row's edge) with the folder icons, the tiles and the bottom buttons */
+  --tab-padding-inline: 16px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab {
+  padding-block: calc(var(--arc-tab-gap) / 2) !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tab-label,
+#tabs-newtab-button .toolbarbutton-text {
+  font-size: var(--arc-tab-font-size) !important;
+}
+
+/* All titles at full strength, as in Safari's sidebar: only the fill marks
+   the selected tab (LibreWolf dims unselected titles to 70%) */
+#tabbrowser-tabs[orient="vertical"] .tab-label-container {
+  opacity: 1 !important;
+}
+
+/* Pinned tiles: same outer edges as the tab rows below (--arc-sidebar-inset
+   from the sidebar edges), even gaps between tiles */
+#tabbrowser-tabs[orient="vertical"] {
+  /* Tab rows: the sidebar's 4px padding + this margin = --arc-sidebar-inset */
+  --tab-margin-inline-inner: calc(var(--arc-sidebar-inset) - 4px) !important;
+  /* Pinned tiles: 4px padding + container margin + half a tile gap per
+     tile = inset */
+  --tab-container-margin-inline-pinned-expanded: calc(var(--arc-sidebar-inset) - 4px - var(--arc-tile-gap) / 2) !important;
+  --tab-margin-inline-pinned-expanded: calc(var(--arc-tile-gap) / 2) !important;
+  /* Tiles are at least --arc-pinned-min-width wide and stretch to fill the
+     row, so the sidebar's width decides how many fit (3 at 260px, a 4th
+     from ~332px, ...) */
+  --tab-background-width-pinned-expanded: var(--arc-pinned-min-width) !important;
+  --tab-pinned-min-width-expanded: calc(var(--arc-pinned-min-width) + var(--arc-tile-gap)) !important;
+}
+
+/* With the sidebar on auto-hide, LibreWolf lists pinned tabs as labeled rows
+   instead of tiles; keep them tiles, sized as in the pinned sidebar (the
+   grid itself is set inside the pinned area by the shortcut script) */
+:root[sidebar-expand-on-hover] #tabbrowser-tabs[orient="vertical"][expanded] #pinned-tabs-container {
+  --tab-pinned-min-width: var(--tab-pinned-min-width-expanded) !important;
+  --tab-padding-inline: calc((var(--tab-collapsed-background-width) + 2 * var(--tab-margin-inline-pinned-expanded) - var(--icon-size)) / 2) !important;
+
+  .tab-label-container {
+    display: none !important;
+  }
+
+  .tab-content {
+    justify-content: center !important;
+  }
+
+  .tab-background {
+    margin-inline: var(--tab-margin-inline-pinned-expanded) !important;
+  }
+
+  /* LibreWolf leaves room after every icon for its title in this mode, which
+     put tile icons off center */
+  :is(.tab-throbber, .tab-icon-pending, .tab-icon-image) {
+    margin-inline-end: 0 !important;
+  }
+}
+
+/* Tiles never show a close button (in auto-hide mode LibreWolf showed one on
+   hover, pushing the icon aside): Cmd+W or the right-click menu reset them */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-close-button {
+  display: none !important;
+}
+
+/* The pinned area grows to show every row (like Arc's favorites) instead of
+   a fixed, hand-resized height that scrolls; capped so many pins can't push
+   the tab list away */
+#pinned-tabs-container[orient="vertical"] {
+  height: auto !important;
+  max-height: 40vh !important;
+  /* 16px from the pinned section to the tab list (as from the URL bar to
+     the tiles), with the divider line centered in it (see below) */
+  /* (counting the tiles' and the first row's half gaps) */
+  margin-bottom: calc(7px - var(--arc-tile-gap) / 2 - var(--arc-tab-gap) / 2) !important;
+}
+
+/* Same gap between tile rows as between tiles side by side (LibreWolf
+   leaves 2px). The grid's row height comes from this variable, and each tile
+   keeps half the gap above and below inside its row. */
+#pinned-tabs-container[orient="vertical"] {
+  --tab-height-with-margin-padding: calc(var(--arc-pinned-tile-height) + var(--arc-tile-gap)) !important;
+}
+
+#pinned-tabs-container[orient="vertical"] .tabbrowser-tab[pinned] {
+  padding-block: calc(var(--arc-tile-gap) / 2) !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-background {
+  background-color: var(--arc-fill-tile) !important;
+}
+
+/* Tiles keep their full-color icon when unloaded (LibreWolf grays out and
+   fades unloaded tabs' icons) */
+#pinned-tabs-container .tabbrowser-tab[pinned] .tab-icon-image[pending] {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Unloaded pinned rows show their icon grayed out, as LibreWolf does for
+   tabs you unload; it doesn't for ones reopened unloaded at startup */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[arc-pinned-row] .tab-icon-image[pending] {
+  filter: grayscale(100%);
+  opacity: 0.5;
+
+  @media (prefers-color-scheme: dark) {
+    filter: grayscale(100%) invert();
+  }
+}
+
+/* The resize handle below the tiles: 16px section gap, no visible bar */
+#vertical-pinned-tabs-splitter {
+  background: transparent !important;
+  border: none !important;
+  margin-bottom: 5px !important;
+}
+
+/* On drop LibreWolf first slides the tab to where it computes the slot (as if
+   every slot were one tab tall, which the tile rows, the divider gap and
+   + New Tab are not) and only then moves it, which showed as a jump. Make
+   that slide near-instant so the tab just lands in place (and invisible
+   for tiles, whose miscalculated spot is a whole row off). */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[tabdrop-samewindow] {
+  transition-duration: 1ms !important;
+
+  &[pinned] {
+    opacity: 0 !important;
+  }
+}
+
+/* ---------- Pinned rows and folders (Arc's "pinned tabs") ----------
+   Normal tabs marked [arc-pinned-row] by the shortcut script (Cmd+D) and
+   folders (LibreWolf's tab groups) form one block at the top of the tab
+   list. Below it: the divider, + New Tab, then the other tabs (Arc's order). */
+#tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab[arc-pinned-row], tab-group, tab-group > *) {
+  order: -2;
+}
+
+/* Folders look like Arc's: a row like the tabs, with a folder icon in the
+   folder's color, instead of LibreWolf's colored pill */
+#tabbrowser-tabs[orient="vertical"][expanded] tab-group > .tab-group-label-container {
+  margin: calc(var(--arc-tab-gap) / 2) var(--tab-margin-inline-inner) !important;
+  padding: 0 !important;
+  height: var(--arc-tab-height) !important;
+
+  > .tab-group-label-hover-highlight {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    border-radius: var(--arc-radius-inner) !important;
+    outline: none !important;
+  }
+
+  &:hover > .tab-group-label-hover-highlight {
+    background: var(--arc-fill-hover) !important;
+  }
+
+  .tab-group-label {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 12px 0 36px !important; /* text lines up with the tab titles */
+    background: transparent !important;
+    border-radius: var(--arc-radius-inner) !important;
+    outline: none !important;
+    color: inherit !important;
+    font-size: var(--arc-tab-font-size) !important;
+    font-weight: 500 !important;
+    line-height: var(--arc-tab-height) !important;
+    text-align: start !important;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset-inline-start: 12px; /* lines up with the tab icons */
+      top: calc(50% - 8px);
+      width: 16px;
+      height: 16px;
+      background-color: var(--tab-group-color);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 4A1.5 1.5 0 0 1 3 2.5h3.1a1.5 1.5 0 0 1 1.06.44L8.3 4.1H13A1.5 1.5 0 0 1 14.5 5.6v6.9A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+  }
+}
+
+/* LibreWolf's end-of-list box, which holds + New Tab, sits right under the
+   pinned block, the divider in the 16px gap above it, so the line always
+   moves with the button. While dragging, LibreWolf would shift the box as if
+   it came after every tab; the script shifts it instead
+   (--arc-newtab-shift), with the rows. */
+#tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery {
+  order: -1;
+  position: relative !important;
+  top: 0 !important;
+  /* 8px, the line, 8px: from the row above (+ its half-gap padding) to the
+     button. Below it, the tab rows' own half-gap padding, so the button
+     keeps the same gap to the next tab as tabs have between them. */
+  margin-block: calc(17px - var(--arc-tab-gap) / 2) calc(var(--arc-tab-gap) / 2) !important;
+  translate: 0 var(--arc-newtab-shift, 0px) !important;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline: var(--tab-margin-inline-inner);
+    top: -9px;
+    height: 1px;
+    background: var(--arc-hairline);
+  }
+}
+
+/* eased while dragging; on drop it snaps, as the tabs land in place */
+:root[arc-dragging] #tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery {
+  transition: translate 200ms ease !important;
+}
+
+/* Keep it there with long tab lists too, instead of LibreWolf's second
+   button at the bottom */
+#tabbrowser-arrowscrollbox[orient="vertical"][overflowing] > #tabbrowser-arrowscrollbox-periphery > #tabs-newtab-button {
+  display: flex !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] > #vertical-tabs-newtab-button {
+  display: none !important;
+}
+
+/* A tab that will become a pinned row when dropped ([arc-drop-row] from the
+   script) is tinted with the accent color, and so is the divider */
+:root[arc-drop-row] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget] .tab-background {
+  background: color-mix(in srgb, AccentColor 25%, var(--arc-panel)) !important;
+  outline: 2px solid var(--arc-focus-ring) !important;
+  outline-offset: -2px !important;
+}
+
+:root[arc-drop-row] #tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery::before {
+  background: AccentColor;
+}
+
+/* While a tab is dragged over the tiles it takes a tile's shape under the
+   pointer ([arc-drag-over-tiles] and --arc-drag-x come from the script) */
+:root[arc-drag-over-tiles] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget]:not([pinned]) {
+  width: calc(var(--arc-pinned-min-width) + var(--arc-tile-gap)) !important;
+  margin-inline-start: max(0px, calc(var(--arc-drag-x) - var(--arc-pinned-min-width) / 2)) !important;
+}
+
+:root[arc-drag-over-tiles] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget]:not([pinned]) .tab-background {
+  min-height: var(--arc-pinned-tile-height) !important;
+  margin-inline: calc(var(--arc-tile-gap) / 2) !important;
+}
+
+:root[arc-drag-over-tiles] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget]:not([pinned]) .tab-content {
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}
+
+:root[arc-drag-over-tiles] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget]:not([pinned]) :is(.tab-label-container, .tab-close-button) {
+  display: none !important;
+}
+
+/* A tile dragged out of the grid takes a row's shape, in the row
+   column ([arc-drag-over-rows], --arc-row-w and --arc-row-dx from the script) */
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] {
+  width: var(--arc-row-w) !important;
+  max-width: none !important;
+  padding-block: 0 !important;
+}
+
+/* The dragged tab's extra offsets: into the row column (a tile, see above)
+   and, with no rows yet, up into the first row's slot ([arc-snap-row]) */
+:root:is([arc-drag-over-rows], [arc-snap-row]) #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget] {
+  translate: var(--arc-row-dx, 0px) var(--arc-snap-dy, 0px) !important;
+}
+
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-background {
+  margin-inline: 4px !important;
+}
+
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-content {
+  justify-content: start !important;
+  padding-inline: 16px !important;
+}
+
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-label-container {
+  display: flex !important;
+  width: auto !important;
+}
+
+/* ...and the tabs below the pointer make room for it */
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned]), .tab-group-label-container) {
+  transition: translate 150ms ease !important;
+}
+
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned]), .tab-group-label-container)[arc-make-room] {
+  translate: 0 calc(var(--arc-tab-height) + var(--arc-tab-gap)) !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tab-background {
+  border-radius: var(--arc-radius-inner) !important;
+  min-height: var(--arc-tab-height) !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:not([selected], [multiselected]):hover .tab-background {
+  background: var(--arc-fill-hover) !important;
+}
+
+/* Tiles rest on a fill, so their hover is a lighter one (the rows' hover
+   fill would make a tile darker) */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned]:not([selected], [multiselected]):hover .tab-background {
+  background: var(--arc-fill-tile-hover) !important;
+}
+
+/* Selected: a soft neutral fill (like Finder/Safari sidebars) instead of
+   LibreWolf's purple-to-orange gradient outline */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:is([selected], [multiselected]) .tab-background {
+  background: var(--arc-fill-selected) !important;
+  border-color: transparent !important;
+  outline-color: transparent !important;
+  box-shadow: var(--arc-shadow-1) !important;
+}
+
+/* Selected tile in its icon's colors (as in Zen): a soft gradient of up to
+   three colors over the usual selected fill, and a hairline in the main
+   color (--arc-tile-c1..c3 and [arc-tile-colored] come from the script; an
+   icon without a clear color keeps the neutral selection above) */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned][arc-tile-colored]:is([selected], [multiselected]) .tab-background {
+  --arc-tile-c2-or: var(--arc-tile-c2, var(--arc-tile-c1));
+  --arc-tile-c3-or: var(--arc-tile-c3, var(--arc-tile-c2-or));
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--arc-tile-c1) 18%, transparent), transparent 70%),
+    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--arc-tile-c3-or) 12%, transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in srgb, var(--arc-tile-c1) 7%, transparent), color-mix(in srgb, var(--arc-tile-c2-or) 9%, transparent)),
+    var(--arc-fill-selected) !important;
+  outline: 1px solid color-mix(in srgb, var(--arc-tile-c1) 75%, transparent) !important;
+  outline-offset: -1px !important;
+}
+
+/* Pinned page dot: a pinned row or tile that's away from the page it was
+   pinned on shows a small dot (the script adds it); clicking it goes back */
+.arc-home-dot {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-inline: 2px;
+  border-radius: 50%;
+
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.45;
+  }
+
+  &:hover {
+    background: var(--arc-fill-hover);
+
+    &::before {
+      opacity: 0.8;
+    }
+  }
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[arc-away] .arc-home-dot {
+  display: flex;
+}
+
+/* on a tile: in its top right corner */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] {
+  .tab-content {
+    position: relative;
+  }
+
+  .arc-home-dot {
+    position: absolute;
+    top: 2px;
+    inset-inline-end: 2px;
+    margin: 0;
+  }
+}
+
+/* A loading tile keeps its icon (LibreWolf swaps it for a spinner, so at
+   launch, when every tile reloads, they all sat blank for seconds); one with
+   no icon yet still shows the spinner */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-icon-image[busy][src] {
+  display: block !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned][image] .tab-throbber {
+  display: none !important;
+}
+
+/* Sound badges on a tile (playing, muted, autoplay blocked): a plain icon in
+   the top left corner, mirroring the pinned page dot on the right, instead of
+   LibreWolf's black circle over the site icon. Still clickable. */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-icon-stack {
+  position: static !important; /* so the badge is placed on the tile */
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-icon-overlay:is([soundplaying], [muted], [activemedia-blocked]) {
+  position: absolute !important;
+  top: 2px !important;
+  inset-inline-start: 2px !important;
+  inset-inline-end: auto !important;
+  width: 16px !important;
+  height: 16px !important;
+  padding: 2px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  background: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  fill: currentColor !important;
+  opacity: 0.55 !important;
+
+  &:hover {
+    background: var(--arc-fill-hover) !important;
+    opacity: 0.9 !important;
+  }
+}
+
+/* Whole pixels: LibreWolf puts 7.5px between a tab's icon and its title and
+   indents folder contents by 8.25px (0.75rem), leaving titles and icons on
+   half pixels and out of line with the folder's own title (44px) */
+#tabbrowser-tabs[orient="vertical"][expanded] {
+  --tab-icon-margin-inline-end: 8px !important;
+
+  tab-group > .tabbrowser-tab {
+    margin-inline-start: 8px !important;
+  }
+}
+
+/* Close button only on hover / selected tab */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:not(:hover, [selected]) .tab-close-button {
+  display: none !important;
+}
+
+#tabs-newtab-button {
+  border-radius: var(--arc-radius-inner) !important;
+}
+
+/* ---------- The floating page card ---------- */
+#tabbrowser-tabpanels,
+.browserStack,
+.browserStack > browser {
+  border-radius: var(--arc-radius) !important;
+}
+
+#tabbrowser-tabpanels {
+  overflow: clip !important;
+  box-shadow: var(--arc-shadow-2) !important;
+  outline: none !important;
+}
+
+/* Split view / devtools keep their own corners tidy */
+.browserSidebarContainer {
+  border-radius: var(--arc-radius) !important;
+  overflow: clip !important;
+}
+
+/* ---------- Sidebar panels (History, Bookmarks, Customize sidebar, ...) ----------
+   The panel sits between the sidebar and the page as a card like the page */
+#sidebar-box {
+  margin-block: var(--arc-gap) !important;
+  border-radius: var(--arc-radius) !important;
+  --sidebar-box-start-start-radius: var(--arc-radius) !important;
+  --sidebar-box-start-end-radius: var(--arc-radius) !important;
+  background: var(--arc-panel) !important;
+  border: none !important;
+  box-shadow: var(--arc-shadow-2) !important;
+  overflow: clip !important;
+}
+
+#sidebar-box #sidebar {
+  border-radius: var(--arc-radius) !important;
+  background: transparent !important;
+}
+
+/* Inside the panel documents (their parts are only reachable through
+   LibreWolf's design tokens) */
+@-moz-document url-prefix("chrome://browser/content/sidebar/") {
+  :root {
+    --border-radius-circle: var(--arc-radius-inner) !important;  /* rows: no pills */
+    --button-background-color-ghost-hover: var(--arc-fill-hover) !important;
+    --button-background-color-ghost-active: var(--arc-fill-selected) !important;
+    --input-text-background-color: var(--arc-field) !important;
+    --input-text-border: 1px solid transparent !important;
+    --input-text-border-radius: var(--arc-radius-inner) !important;
+    --input-search-border-radius: var(--arc-radius-inner) !important;
+  }
+
+  body {
+    background: transparent !important;
+  }
+}
+
+/* =====================================================================
+   URL bar in the sidebar (Arc layout)
+   The auto-hide and fullscreen sections below build on this one.
+   ===================================================================== */
+/* No fixed width: the toolbar follows the sidebar live via CSS anchor
+   positioning, so dragging the sidebar edge resizes both. */
+:root {
+  --arc-row-height: 40px;        /* height of the buttons row */
+  --arc-urlbar-height: 34px;     /* height of the URL bar row */
+  --arc-urlbar-gap: 7px;         /* space between the button row and the URL bar (8px to its visible edge) */
+  --arc-urlbar-expanded-width: 480px; /* URL bar width while editing */
+  --arc-sidebar-min-width: 260px; /* sidebar can't be dragged narrower than this */
+}
+
+/* Minimum sidebar width, so the window buttons, the sidebar button and
+   back / forward / reload always fit in the top row.
+   Only while expanded, so the auto-hide icon strip keeps its own narrow width. */
+#sidebar-container[sidebar-launcher-expanded] {
+  min-width: var(--arc-sidebar-min-width) !important;
+}
+
+#sidebar-container {
+  anchor-name: --arc-sidebar;
+}
+
+/* Lift the toolbar out of the layout and pin it over the sidebar */
+#navigator-toolbox {
+  box-sizing: border-box !important;
+  /* LibreWolf clips the toolbox; the URL bar grows past it while editing */
+  overflow: visible !important;
+  position: fixed !important;
+  position-anchor: --arc-sidebar;
+  top: 0 !important;
+  left: anchor(--arc-sidebar left) !important;
+  width: anchor-size(--arc-sidebar width) !important;
+  /* Anchored elements are hidden by default while their anchor is off-screen
+     (re-checked only periodically). The sidebar ends its hide animation fully
+     off-screen, which blanked the floating URL bar for ~200ms. */
+  position-visibility: always !important;
+  z-index: 10 !important;
+}
+
+/* Push the tab list below the toolbar */
+#vertical-tabs {
+  /* + the macOS menu bar's height while it's shown in fullscreen, which
+     LibreWolf adds here itself (this rule overrode it) */
+  /* (16px from the URL bar to the tiles, counting each tile's half gap) */
+  padding-top: calc(var(--arc-row-height) + var(--arc-urlbar-gap) + var(--arc-urlbar-height) + 11px - var(--arc-tile-gap) / 2 + var(--fullscreen-menubar-shift, 0px)) !important;
+}
+
+/* LibreWolf positions a dragged tab absolutely, offset from the tab strip;
+   make the strip its containing block (not #browser) so it stays under the
+   pointer */
+#tabbrowser-tabs[orient="vertical"] {
+  position: relative !important;
+}
+
+/* Row 1: buttons. Row 2 (reserved with padding): the URL bar */
+#nav-bar {
+  box-sizing: border-box !important;
+  position: relative !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: var(--arc-row-height) !important;
+  padding-top: 4px !important;
+  padding-bottom: calc(var(--arc-urlbar-gap) + var(--arc-urlbar-height) + 4px) !important;
+}
+
+#nav-bar-customization-target {
+  min-width: 0 !important;
+}
+
+/* Keep only back, forward and reload in the button row, at its right end
+   (the URL bar lives in this list too, positioned below; downloads and
+   extensions move to the sidebar's bottom row) */
+#nav-bar-customization-target > :not(#back-button, #forward-button, #stop-reload-button, #reload-button, #stop-button, #downloads-button, #unified-extensions-button, #urlbar-container) {
+  display: none !important;
+}
+
+/* Downloads and Extensions: at the right end of the sidebar's bottom row
+   (Bookmarks, History), sized and spaced like every icon button (30px, 34px
+   apart); the last one's icon is in line with the tabs' close buttons. They
+   stay in the toolbar, so they hide and slide together with it; the toolbar
+   starts at the window's top, so 100vh is the sidebar's bottom edge. */
+:is(#downloads-button, #unified-extensions-button) {
+  position: absolute !important;
+  /* (minus the toolbar's shift under the macOS menu bar in fullscreen) */
+  top: calc(100vh - 36.5px - var(--fullscreen-menubar-shift, 0px)) !important;
+  right: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#downloads-button {
+  right: 46px !important;
+}
+
+:is(#downloads-button, #unified-extensions-button) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 7px !important;
+}
+
+/* Back, forward and reload at the right end; reload's icon in line with the
+   tabs' close buttons and the Extensions button below */
+#nav-bar-customization-target {
+  justify-content: flex-end !important;
+  margin-inline-end: 10px !important;
+}
+
+/* Icon buttons, one style everywhere (the bottom row's own buttons get it from
+   the shortcut script): 30px squares 34px apart, with the tab rows' corners
+   and hover / pressed fills */
+#navigator-toolbox {
+  --toolbarbutton-hover-background: var(--arc-fill-hover) !important;
+  --toolbarbutton-active-background: var(--arc-fill-selected) !important;
+}
+
+#nav-bar :is(#arc-sidebar-button, #back-button, #forward-button, #reload-button, #stop-button) {
+  padding: 0 2px !important;
+
+  > .toolbarbutton-icon {
+    width: 30px !important;
+    height: 30px !important;
+    padding: 7px !important;
+    margin-block: 1px !important; /* centered in the 32px row */
+  }
+}
+
+/* No menu button: everything in it is in the macOS menu bar */
+#PanelUI-button {
+  display: none !important;
+}
+
+/* Sidebar button (added by the shortcut script) right after the window
+   buttons: switches between the pinned and the auto-hiding sidebar (Cmd+S) */
+#arc-sidebar-button {
+  order: -1; /* with the window buttons' box, which comes later in the toolbar */
+  /* its icon 16px after the last window button (they end at 72px and are
+     9px apart; at that spacing it read as a fourth window button) */
+  margin-inline-start: 7px !important;
+  list-style-image: url("chrome://browser/skin/sidebar-collapsed.svg");
+}
+
+#urlbar-container {
+  position: absolute !important;
+  /* Same side insets as the tabs below, so both share one column edge */
+  left: var(--arc-sidebar-inset) !important;
+  right: auto !important;
+  bottom: 4px !important;
+  width: calc(100% - 2 * var(--arc-sidebar-inset)) !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: var(--arc-urlbar-height) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* While editing, the bar grows over the page (like Safari's compact layout)
+   so more of the address is visible; it shrinks back afterwards */
+#urlbar-container:has(#urlbar[focused]) {
+  width: max(calc(100% - 2 * var(--arc-sidebar-inset)), var(--arc-urlbar-expanded-width)) !important;
+  z-index: 20 !important;
+}
+
+#urlbar-container:has(#urlbar[focused]) .urlbar-background {
+  box-shadow: var(--arc-shadow-3) !important;
+}
+
+/* Animate only while the bar lives in the sidebar (not for the Cmd+T bar) */
+:root:not([sidebar-expand-on-hover]) #urlbar-container,
+:root[sidebar-expand-on-hover]:has(#sidebar-container[sidebar-launcher-expanded]) #urlbar-container {
+  transition: width var(--arc-open-duration) var(--arc-ease-open) !important;
+}
+
+#urlbar {
+  width: 100% !important;
+  /* Same shape and shadow as the floating command bar; focus shows the
+     accent-colored ring, as macOS text fields do */
+  --urlbarview-border-radius: var(--arc-radius);
+  /* Focused, it can extend over the page, so it's solid (no blur exists) */
+  --urlbar-background-color-focus: var(--arc-panel);
+  --urlbar-input-container-outline-open: none;
+  --urlbar-input-container-outline-open-focused: none;
+  --urlbar-background-box-shadow-open: var(--arc-shadow-3);
+  /* Clip the bar's contents with the same corners (LibreWolf uses 24px) */
+  --urlbar-border-radius: var(--arc-radius);
+}
+
+/* Engine pill shows only the engine's icon: no name and no wordmark logo
+   next to it when an engine is picked (the × to leave search mode stays) */
+#urlbar :is(.searchmode-switcher-title, .searchmode-switcher-wordmark) {
+  display: none !important;
+}
+
+/* Engine pill: corners concentric with the bar (bar radius minus the gap) */
+#urlbar .searchmode-switcher {
+  --button-border-radius: calc(var(--arc-radius) - var(--urlbar-input-container-padding)) !important;
+}
+
+.urlbarView-background {
+  box-shadow: var(--arc-shadow-3) !important;
+}
+
+/* Suggestion list, Spotlight-style: accent-colored selection, quiet hover,
+   gray secondary text, rows nested inside the panel's corners */
+#urlbar .urlbarView {
+  --urlbarview-background-color-selected: var(--arc-focus) !important;
+  --urlbarview-text-color-selected: AccentColorText !important;
+  --urlbarview-background-color-hover: var(--arc-fill-hover) !important;
+  --urlbarView-row-border-radius: var(--arc-radius-inner) !important;
+  --link-color: var(--arc-label-secondary) !important;
+}
+
+#urlbar .urlbarView-row[selected] {
+  --link-color: AccentColorText !important;
+  --urlbarview-text-color-secondary: AccentColorText !important;
+}
+
+/* Every popup panel (extensions, downloads, engine menu, site info, ...) as
+   a macOS menu: solid panel, tight padding, rows nested inside its corners,
+   accent-colored highlight. Dialog-like panels get a popover layout instead
+   (see "Dialog panels" at the end). */
+panel {
+  --panel-background-color: var(--arc-panel) !important;
+  --panel-border-color: var(--arc-hairline) !important;
+  --panel-border-radius: var(--arc-radius) !important;
+  --panel-padding-block: 5px !important;
+  --panel-padding: 5px 0 !important;
+  --panel-menuitem-margin: 0 5px !important;
+  --panel-menuitem-padding: 5px 8px !important;
+  --panel-menuitem-border-radius: calc(var(--arc-radius) - 5px) !important;
+  --panel-separator-color: var(--arc-hairline) !important;
+  --button-background-color-menu-hover: var(--arc-focus) !important;
+  --button-text-color-menu-hover: AccentColorText !important;
+  --button-background-color-menu-active: var(--arc-focus) !important;
+  --button-text-color-menu-active: AccentColorText !important;
+}
+
+/* Menu rows at macOS menu height (LibreWolf: 32px) */
+panel :is(.subviewbutton, panelview .toolbarbutton-1) {
+  min-height: 26px !important;
+}
+
+panel toolbarseparator {
+  --panel-separator-padding: 5px 0 !important;
+}
+
+/* "Switch to Tab" and similar badges: soft translucent pill, no outline */
+#urlbar .urlbarView-action {
+  outline: none !important;
+  border-color: transparent !important;
+  background-color: var(--arc-fill-selected) !important;
+}
+
+#urlbar .urlbarView-row[selected] .urlbarView-action {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: AccentColorText !important;
+}
+
+/* Page card now starts at the top of the window */
+#tabbrowser-tabbox {
+  margin: var(--arc-gap) var(--arc-gap) var(--arc-gap) 0 !important;
+}
+
+/* ---------- Auto-hide sidebar (expand on hover) ---------- */
+/* States set by LibreWolf on #sidebar-container:
+   collapsed = no [sidebar-launcher-expanded], no [sidebar-ongoing-animations]
+   expanding = [sidebar-launcher-expanded][sidebar-ongoing-animations]
+   collapsing = [sidebar-ongoing-animations] only */
+:root {
+  --arc-hover-strip: 8px;        /* visible gap left of the page while collapsed */
+  --arc-hover-zone: 24px;        /* how far from the window edge hovering reveals the sidebar */
+  /* Motion: Apple-like curves (fast start, soft settle) */
+  --arc-open-duration: 320ms;
+  --arc-close-duration: 220ms;
+  --arc-pop-duration: 180ms;     /* floating bar appearing */
+  --arc-hover-duration: 150ms;   /* tab / button hover */
+  --arc-ease-open: cubic-bezier(0.32, 0.72, 0, 1);
+  --arc-ease-close: cubic-bezier(0.4, 0, 1, 1);
+  --arc-command-bar-width: min(680px, 80vw); /* floating URL bar when the sidebar is hidden */
+  --arc-spotlight-height: 56px;
+  --arc-spotlight-font-size: 20px;
+  --arc-spotlight-list-font-size: 14px;
+  --arc-spotlight-icon-size: 20px;     /* engine icon and go arrow, matching the text */
+  --arc-spotlight-chevron-size: 14px;  /* engine pill chevron (LibreWolf: 12px) */
+}
+
+/* No resizing in auto-hide mode (resize it with auto-hide off) */
+:root[sidebar-expand-on-hover] #sidebar-launcher-splitter {
+  display: none !important;
+}
+
+/* Collapsed: shrink to a thin, empty strip */
+:root[sidebar-expand-on-hover] #sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations]) {
+  width: var(--arc-hover-strip) !important;
+  min-width: var(--arc-hover-strip) !important;
+  max-width: var(--arc-hover-strip) !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  /* LibreWolf paints the auto-hide launcher dark; let the window color show */
+  background: transparent !important;
+  border: none !important;
+}
+
+/* The hover check uses the inner element's area, so let it reach a bit
+   under the page's left edge (invisible) to make the target easier to hit */
+:root[sidebar-expand-on-hover] #sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations]) > sidebar-main {
+  width: var(--arc-hover-zone) !important;
+  min-width: var(--arc-hover-zone) !important;
+  max-width: var(--arc-hover-zone) !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}
+
+/* Collapsing: LibreWolf switches tabs to the square icon layout at the start
+   of the slide-out, so hide the contents and let the empty panel slide away */
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded]) > sidebar-main {
+  visibility: hidden !important;
+}
+
+/* LibreWolf counter-slides the sidebar contents during the animation so its
+   collapsed icons stay put. With a fully hidden sidebar that shows an empty
+   panel sliding in first, so make the contents ride along with the panel
+   (!important beats the script animation) */
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations] > sidebar-main {
+  translate: none !important;
+}
+
+/* Keep the page card in place while the sidebar floats over it */
+:root[sidebar-expand-on-hover] #tabbrowser-tabbox:is([sidebar-launcher-expanded], [sidebar-ongoing-animations]) {
+  margin-inline-start: var(--arc-hover-strip) !important;
+}
+
+/* Collapsed: hide the toolbar */
+:root[sidebar-expand-on-hover]:not([arc-floating-urlbar]):has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])) #navigator-toolbox {
+  visibility: hidden !important;
+}
+
+/* During a floating edit the toolbar's own visibility is never switched:
+   flipping it while the sidebar finished hiding blanked the floating bar for
+   ~200ms (a repaint glitch, not a style change). Hide its other parts instead. */
+:root[sidebar-expand-on-hover][arc-floating-urlbar]:has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])) :is(#nav-bar > :not(#nav-bar-customization-target), #nav-bar-customization-target > :not(#urlbar-container)) {
+  visibility: hidden !important;
+}
+
+:root[sidebar-expand-on-hover][arc-floating-urlbar]:has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])) #nav-bar::after {
+  visibility: hidden !important;
+}
+
+/* Collapsed: keep the URL bar focusable (invisible), so Cmd+T / Cmd+L still work */
+:root[sidebar-expand-on-hover]:has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])) #urlbar-container {
+  visibility: visible !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ...and while it's in use (focused, hovered, or its engine menu is open),
+   show it as a floating Spotlight-style command bar. During a marked
+   floating edit ([arc-floating-urlbar], set by the shortcut script) the mark
+   alone keeps it floating, so LibreWolf briefly dropping [focused] while the
+   sidebar moves can't make it blink. The new tab bar (Cmd+T / + New Tab,
+   [arc-newtab-bar] from the script) floats even with the sidebar shown. */
+:root:is([arc-newtab-bar], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) {
+  #urlbar-container {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    top: 18vh !important;
+    bottom: auto !important;
+    /* Centered without translate: the suggestions anchor to the bar's untransformed box */
+    left: 0 !important;
+    right: 0 !important;
+    margin-inline: auto !important;
+    width: var(--arc-command-bar-width) !important;
+    height: var(--arc-spotlight-height) !important;
+    z-index: 100 !important;
+  }
+
+  /* Shape, ring and shadow are shared with the sidebar URL bar (see above);
+     only the size differs */
+  #urlbar {
+    --urlbar-height: var(--arc-spotlight-height);
+    /* Spotlight-like solid panel with the same accent focus ring as the
+       sidebar bar, and icons scaled up to match the larger text */
+    --toolbar-field-background-color: var(--arc-panel);
+    --toolbar-field-focus-background-color: var(--arc-panel);
+    --urlbar-background-color: var(--arc-panel);
+    --urlbar-background-color-focus: var(--arc-panel);
+    --toolbar-field-border-color: transparent;
+    --icon-size: var(--arc-spotlight-icon-size);
+    font-size: var(--arc-spotlight-font-size) !important;
+  }
+
+  #urlbar-input {
+    font-size: var(--arc-spotlight-font-size) !important;
+  }
+
+  #urlbar .searchmode-switcher-dropmarker {
+    width: var(--arc-spotlight-chevron-size) !important;
+    height: var(--arc-spotlight-chevron-size) !important;
+  }
+
+  #urlbar .urlbar-go-button {
+    width: var(--arc-spotlight-icon-size) !important;
+    height: var(--arc-spotlight-icon-size) !important;
+  }
+
+  /* Results at body size; only the input itself is large */
+  .urlbarView {
+    --icon-size: 16px;
+    font-size: var(--arc-spotlight-list-font-size) !important;
+  }
+
+  /* Floating shadow + hairline edge even before suggestions open */
+  #urlbar .urlbar-background {
+    box-shadow: var(--arc-shadow-3) !important;
+  }
+
+  /* Engine pill fills the bar's height, leaving the same gap above and below
+     as on its left side */
+  #urlbar .searchmode-switcher {
+    height: calc(var(--arc-spotlight-height) - 2 * var(--urlbar-input-container-padding)) !important;
+  }
+}
+
+/* ---------- Motion (Apple-style) ----------
+   LibreWolf slides the panel from a script (`translate`, symmetric
+   ease-in-out, 400ms). Cancel that and run our own animation on `transform`
+   instead, so panel and toolbar share one curve: opening starts fast and
+   settles softly, closing is quicker and accelerates away. */
+@keyframes arc-slide-in {
+  from { transform: translateX(-100%); }
+  to   { transform: none; }
+}
+
+@keyframes arc-slide-out {
+  from { transform: none; opacity: 1; }
+  to   { transform: translateX(-100%); opacity: 0; }
+}
+
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations] {
+  translate: none !important;
+}
+
+/* Opening: panel and toolbar together */
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-launcher-expanded][sidebar-ongoing-animations],
+:root[sidebar-expand-on-hover]:not([arc-floating-urlbar]):has(#sidebar-container[sidebar-launcher-expanded][sidebar-ongoing-animations]) #navigator-toolbox {
+  animation: arc-slide-in var(--arc-open-duration) var(--arc-ease-open) both !important;
+}
+
+/* Closing: panel and toolbar together (the panel's contents are already
+   hidden, see "Collapsing" above) */
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded]),
+:root[sidebar-expand-on-hover]:not([arc-floating-urlbar]):has(#sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded])) #navigator-toolbox {
+  animation: arc-slide-out var(--arc-close-duration) var(--arc-ease-close) both !important;
+}
+
+/* Floating bar: fades and grows in slightly, like Spotlight. Animated on the
+   bar itself, since its container's opacity is pinned with !important. */
+@keyframes arc-pop-in {
+  from { opacity: 0; scale: 0.96; }
+  to   { opacity: 1; scale: 1; }
+}
+
+:root:is([arc-newtab-bar], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) #urlbar {
+  animation: arc-pop-in var(--arc-pop-duration) var(--arc-ease-open) both;
+}
+
+/* Tabs and toolbar buttons: soft state changes instead of instant flips */
+#tabbrowser-tabs[orient="vertical"] .tab-background,
+#nav-bar toolbarbutton > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  transition: background-color var(--arc-hover-duration) ease-out,
+              box-shadow var(--arc-hover-duration) ease-out !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --arc-open-duration: 0ms;
+    --arc-close-duration: 0ms;
+    --arc-pop-duration: 0ms;
+    --arc-hover-duration: 0ms;
+  }
+}
+
+/* ---------- Floating edit stays floating ----------
+   [arc-floating-urlbar] is set by the shortcut script (arc-shortcut/) while
+   an edit that started in the floating bar is in progress. The bar then
+   stays in the window even if the sidebar opens, and the sidebar shows an
+   empty field in its place. */
+:root:is([arc-floating-urlbar], [arc-newtab-bar]) #nav-bar::after {
+  content: "";
+  position: absolute;
+  left: var(--arc-sidebar-inset);
+  bottom: 4px;
+  width: calc(100% - 2 * var(--arc-sidebar-inset));
+  height: var(--arc-urlbar-height);
+  border-radius: var(--arc-radius);
+  background: var(--arc-field);
+}
+
+/* Each part moves by about the sidebar's width (a percentage would be the
+   part's own width) */
+@keyframes arc-parts-in {
+  from { transform: translateX(calc(-1 * var(--arc-parts-slide))); }
+  to   { transform: none; }
+}
+
+@keyframes arc-parts-out {
+  from { transform: none; opacity: 1; }
+  to   { transform: translateX(calc(-1 * var(--arc-parts-slide))); opacity: 0; }
+}
+
+:root {
+  --arc-parts-slide: 300px;
+}
+
+/* Sliding the whole toolbar would carry the floating bar along (a moving
+   ancestor drags fixed-position children), so during a floating edit the
+   toolbar slide is skipped (see "Motion") and its parts slide instead */
+:root[arc-floating-urlbar][sidebar-expand-on-hover]:has(#sidebar-container[sidebar-launcher-expanded][sidebar-ongoing-animations]) :is(#nav-bar > :not(#nav-bar-customization-target), #nav-bar-customization-target > :not(#urlbar-container)),
+:root[arc-floating-urlbar][sidebar-expand-on-hover]:has(#sidebar-container[sidebar-launcher-expanded][sidebar-ongoing-animations]) #nav-bar::after {
+  animation: arc-parts-in var(--arc-open-duration) var(--arc-ease-open) both !important;
+}
+
+:root[arc-floating-urlbar][sidebar-expand-on-hover]:has(#sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded])) :is(#nav-bar > :not(#nav-bar-customization-target), #nav-bar-customization-target > :not(#urlbar-container)),
+:root[arc-floating-urlbar][sidebar-expand-on-hover]:has(#sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded])) #nav-bar::after {
+  animation: arc-parts-out var(--arc-close-duration) var(--arc-ease-close) both !important;
+}
+
+/* Expanded on hover: a floating panel over the page.
+   The pinned sidebar shows macOS's own window background, which CSS can't
+   reach, and LibreWolf paints the floating one near-black. Match it with the
+   color measured from the pinned sidebar (light value is an estimate). */
+:root {
+  --arc-hover-panel-bg: light-dark(rgb(236, 235, 239), rgb(59, 58, 62));
+}
+
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-launcher-expanded],
+:root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations] {
+  background: var(--arc-hover-panel-bg) !important;
+  border: none !important;
+  border-radius: 0 var(--arc-radius) var(--arc-radius) 0 !important;
+  box-shadow: var(--arc-shadow-3) !important;
+}
+
+/* ---------- Fullscreen ---------- */
+/* When the macOS menu bar slides in, LibreWolf shifts the toolbar down with
+   `translate`. A translated toolbar becomes the frame of the floating URL bar
+   inside it, which then centered itself in the 260px toolbar (spilling over
+   the sidebar) instead of the window. Same shift, made with `top`. */
+:root[inFullscreen] #navigator-toolbox {
+  translate: none !important;
+  top: var(--fullscreen-menubar-shift, 0px) !important;
+}
+
+/* ---------- Fullscreen (auto-hide) ---------- */
+/* The open sidebar floats over the page, same as in a window. */
+
+/* Fullscreen slides the whole toolbox off the top (negative margin, 0.8s) and
+   only brings it back when the pointer hits the screen edge. Our toolbar lives
+   inside the sidebar, so let the sidebar alone decide when it shows. */
+:root[sidebar-expand-on-hover][inFullscreen] #navigator-toolbox {
+  margin-top: 0 !important;
+  transition: none !important;
+}
+
+/* While fullscreen considers the chrome hidden, LibreWolf skips drawing the
+   sidebar's contents (content-visibility: hidden) but still paints its
+   background, so hovering showed an empty gray panel first. */
+:root[sidebar-expand-on-hover][fullscreenNavToolboxHidden]:not([inDOMFullscreen]) #sidebar-container {
+  content-visibility: visible !important;
+}
+
+/* ---------- New tab bar ----------
+   While Cmd+T / + New Tab's floating bar is open ([arc-newtab-bar], set by
+   the shortcut script), + New Tab looks hovered: that's where the tab will
+   appear. */
+:root[arc-newtab-bar] #tabbrowser-tabs[orient="vertical"] #tabs-newtab-button {
+  background-color: var(--arc-fill-hover) !important;
+}
+
+/* The bar jumps between the sidebar and the middle of the window without
+   the sidebar bar's width animation ([arc-newtab-closing] lasts a frame) */
+:root:is([arc-newtab-bar], [arc-newtab-closing]) #urlbar-container {
+  transition: none !important;
+}
+
+/* A new window's empty first tab is the page behind the bar, not a tab yet
+   ([arc-start-page] from the script, until something loads in it) */
+#tabbrowser-tabs .tabbrowser-tab[arc-start-page] {
+  display: none !important;
+}
+
+/* ---------- Dialog panels (Translate, Edit Bookmark) as macOS popovers ----------
+   The menu style above leaves panels no side padding, which these
+   dialog-like panels lay themselves out with (so their text touched the
+   edge). Here: a 16px inset, body text in the secondary color, labels 6px
+   above filled fields and popup buttons, regular-weight 28px buttons, 8px
+   corners. */
+:is(#full-page-translations-panel, #select-translations-panel, #editBookmarkPanel) {
+  --panel-padding: 16px !important;
+
+  .translations-panel-header {
+    min-height: 0 !important;
+    padding: 16px 16px 0 !important;
+  }
+
+  .translations-panel-settings-gear-icon {
+    border-radius: var(--arc-radius-inner) !important;
+  }
+
+  #full-page-translations-panel-intro {
+    line-height: 1.4 !important;
+    color: var(--arc-label-secondary) !important;
+    margin-block-end: 4px !important;
+  }
+
+  .translations-panel-content {
+    padding: 8px 16px 0 !important;
+  }
+
+  #full-page-translations-panel-lang-selection > label {
+    margin-block: 12px 6px !important;
+  }
+
+  input:not([type="checkbox"]) {
+    box-sizing: border-box !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding-block: 0 !important;
+    padding-inline: 8px !important;
+    border: none !important;
+    border-radius: var(--arc-radius-inner) !important;
+    background-color: var(--arc-field) !important;
+  }
+
+  menulist {
+    /* its label (inside the menulist) is semibold through this variable */
+    --font-weight-semibold: 400 !important;
+    font-weight: 400 !important;
+    min-height: 28px !important;
+    padding-block: 0 !important;
+    border: none !important;
+    border-radius: var(--arc-radius-inner) !important;
+    background-color: var(--arc-field) !important;
+
+    &:hover {
+      background-color: var(--arc-fill-selected) !important;
+    }
+  }
+
+  :is(.translations-panel-button-group, moz-button-group) {
+    margin: 16px !important;
+    gap: 8px !important;
+  }
+
+  button {
+    min-height: 28px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    border-radius: var(--arc-radius-inner) !important;
+    font-weight: 400 !important;
+  }
+
+  button:not([default]) {
+    border: none !important;
+    background-color: var(--arc-field) !important;
+
+    &:hover {
+      background-color: var(--arc-fill-selected) !important;
+    }
+  }
+}
