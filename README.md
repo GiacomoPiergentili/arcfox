@@ -27,6 +27,11 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Fullscreen: the sidebar and toolbar keep working when the macOS menu bar slides in.
 - Start-up: the tab list appears complete (tiles, rows, folders, icons) with a short fade, instead of popping in piece by piece; the command bar appears straight in the middle (never in the sidebar first).
 
+### Profiles (Arc's Spaces)
+- LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
+- **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one ringed; hover for the name), as many as fit. Click one to bring its window forward (or start it).
+- **+** creates a profile already set up for this look (its `chrome` folder linked to this one, the settings it needs) and opens it on LibreWolf's page to name it and pick an avatar and color.
+
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
 - **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
 - **Pinned rows** (Cmd+D): normal tabs kept above the divider; saved and reopened (unloaded) at every launch.
@@ -153,6 +158,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 19. **Drag torture test** (random circles in and out of the sidebar, detours over the page, every kind of item, checked against a list of invariants afterwards): a drag that left the sidebar was treated as over, so coming back left tabs squeezed and fighting LibreWolf's own drag state; a tab dropped on its own page was torn off into a new window; a tile dropped inside a folder landed outside it.
 20. **Peek** (as in Arc): links to other sites from tiles and pinned rows open in a floating card over the pinned page; open as tab, split, or close.
 21. **Start-up**: recorded at 60 fps: a stray "New Tab" row, blank tiles and icons arriving one by one for about a second. Tiles now come back unloaded (loading three heavy sites at launch was most of the wait), and the tab list stays hidden until it's complete, then fades in.
+22. **Profile switcher**: LibreWolf profiles as Arc's Spaces, switched from the bottom of the sidebar; new profiles come set up for this look.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

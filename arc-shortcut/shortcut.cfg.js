@@ -2153,6 +2153,142 @@ try {
         }
       }, true);
 
+      // --- profile switcher (Arc's Space switcher, with LibreWolf profiles) ---
+      // In the middle of the sidebar's bottom row: the profiles' avatars
+      // (up to three, the current one highlighted; hover for the name) and a
+      // +. A click on another profile brings its window forward (or starts
+      // it); + creates a profile set up for this look (its chrome folder
+      // linked to this one, the settings it needs) and opens it on
+      // LibreWolf's "customize your profile" page. Hidden in private windows
+      // and when LibreWolf's profiles are off.
+      const profilesBox = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+      profilesBox.id = "arc-profiles";
+      profilesBox.hidden = true;
+      doc.getElementById("downloads-button")?.after(profilesBox);
+      let profileService = null;
+      try {
+        ({ SelectableProfileService: profileService } = ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
+      } catch {}
+      // As many avatars as fit between the bottom row's buttons (centered,
+      // 4px clear of them; 24px buttons 4px apart, the + included): fewer in
+      // a narrow sidebar, always the current one
+      const maxProfiles = () => {
+        const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
+        // Bookmarks / History end 77px in, Downloads starts 76px from the end
+        const room = width - 2 * 81;
+        return Math.max(1, Math.floor((room + 4) / 28) - 1);
+      };
+      let lastProfiles = null;
+      const profileButton = (label, onClick) => {
+        const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
+        b.className = "arc-profile";
+        b.title = label;
+        b.setAttribute("aria-label", label);
+        b.addEventListener("click", onClick);
+        return b;
+      };
+      // (list, current): also called by the tests with made-up profiles
+      const renderProfiles = async (list, current) => {
+        lastProfiles = [list, current];
+        const max = maxProfiles();
+        const shown = list.filter(p => p.id === current?.id);
+        for (const p of list) {
+          if (shown.length >= max) {
+            break;
+          }
+          if (!shown.includes(p)) {
+            shown.push(p);
+          }
+        }
+        shown.sort((a, b) => list.indexOf(a) - list.indexOf(b));
+        const buttons = [];
+        for (const p of shown) {
+          const isCurrent = p.id === current?.id;
+          const b = profileButton(p.name, () => !isCurrent && profileService?.launchInstance(p));
+          b.toggleAttribute("current", isCurrent);
+          if (isCurrent) {
+            b.setAttribute("aria-current", "true");
+          }
+          const img = doc.createElementNS("http://www.w3.org/1999/xhtml", "img");
+          img.alt = "";
+          try {
+            img.src = p.hasCustomAvatar ? await p.getAvatarURL(20) : `chrome://browser/content/profiles/assets/20_${p.avatar}.svg`;
+          } catch {
+            img.src = "chrome://browser/content/profiles/assets/20_default-favicon.svg";
+          }
+          if (p.theme?.themeBg) {
+            b.style.setProperty("--arc-profile-bg", p.theme.themeBg);
+          }
+          if (p.theme?.themeFg) {
+            b.style.setProperty("--arc-profile-fg", p.theme.themeFg);
+          }
+          b.append(img);
+          buttons.push(b);
+        }
+        const add = profileButton("New Profile", () => createProfile());
+        add.classList.add("arc-profile-new");
+        buttons.push(add);
+        profilesBox.replaceChildren(...buttons);
+        profilesBox.hidden = false;
+      };
+      profilesBox._arcRender = renderProfiles;
+      const refreshProfiles = async () => {
+        if (isPrivate || !profileService?.isEnabled) {
+          profilesBox.hidden = true;
+          return;
+        }
+        let list = [];
+        try {
+          list = await profileService.getAllProfiles();
+        } catch {}
+        renderProfiles(list, profileService.currentProfile);
+      };
+      // A new profile, set up for this look before its first start
+      const setUpProfile = async dir => {
+        const chrome = win.Services.dirsvc.get("UChrm", Ci.nsIFile);
+        const source = chrome.isSymlink() ? chrome.target : chrome.path;
+        const link = win.PathUtils.join(dir, "chrome");
+        if (!(await win.IOUtils.exists(link))) {
+          const ln = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+          ln.initWithPath("/bin/ln");
+          const proc = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
+          proc.init(ln);
+          proc.run(true, ["-s", source, link], 3);
+        }
+        const prefsFile = win.PathUtils.join(dir, "prefs.js");
+        let text = (await win.IOUtils.exists(prefsFile)) ? await win.IOUtils.readUTF8(prefsFile) : "";
+        for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+          if (!text.includes(`"${name}"`)) {
+            text += `user_pref("${name}", true);\n`;
+          }
+        }
+        await win.IOUtils.writeUTF8(prefsFile, text);
+      };
+      const createProfile = async () => {
+        try {
+          const profile = await profileService.createNewProfile(false);
+          await setUpProfile(profile.path);
+          profileService.launchInstance(profile, ["about:newprofile"]);
+        } catch (e) {
+          console.error("Arc sidebar (new profile):", e);
+        }
+      };
+      if (!isPrivate && profileService) {
+        const profilesObserver = { observe: () => refreshProfiles() };
+        win.Services.obs.addObserver(profilesObserver, "sps-profiles-updated");
+        win.addEventListener("unload", () => win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated"), { once: true });
+        refreshProfiles();
+      }
+      // the sidebar resized: recount what fits
+      let profilesFit = maxProfiles();
+      new win.ResizeObserver(() => {
+        const fit = maxProfiles();
+        if (fit !== profilesFit && lastProfiles && !profilesBox.hidden) {
+          profilesFit = fit;
+          renderProfiles(...lastProfiles);
+        }
+      }).observe(doc.querySelector("sidebar-main") || doc.documentElement);
+
       // --- the same sidebar in every window (as in Arc) ---
       // When another window saves the shared list, this window makes its own
       // tiles, rows and folders match it: missing ones are created (unloaded),

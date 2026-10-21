@@ -353,6 +353,28 @@ gBrowser.removeTab(t, {animate: false}); await wait(500);
 return result({});
 """),
 
+    ("profile switcher: bottom row, centered", r"""
+const box = document.getElementById("arc-profiles");
+check(box && box.hidden, "hidden when LibreWolf's profiles are off (a test profile isn't registered)");
+const fake = [1, 2, 3, 4].map(i => ({id: i, name: "P" + i, avatar: "book", hasCustomAvatar: false, theme: {themeBg: "rgb(120, 190, 255)", themeFg: "rgb(0, 30, 60)"}}));
+await box._arcRender(fake, fake[3]); await wait(300);
+const sb = R(document.querySelector("sidebar-main")), dl = R(document.getElementById("downloads-button"));
+const b = [...box.children].map(R);
+check(box.children.length >= 2 && box.querySelector(".arc-profile-new"), "profiles and a +: " + box.children.length);
+check([...box.children].some(c => c.hasAttribute("current") && c.title === "P4"), "the current profile is always shown, and marked");
+check(Math.abs((b[0].x + b.at(-1).r) / 2 - (sb.x + sb.w / 2)) <= 1, "centered in the sidebar");
+check(b.every(x => Number.isInteger(x.x)), "on whole pixels");
+check(near(b[0].y + b[0].h / 2, dl.y + dl.h / 2, 1), "in line with Downloads");
+check(b.at(-1).r < dl.x, "clear of Downloads");
+const wide = box.children.length;
+document.getElementById("sidebar-container").style.width = "300px"; await wait(400);
+check(box.children.length > wide, "a wider sidebar fits more: " + wide + " -> " + box.children.length);
+check(R(box.lastElementChild).r < R(document.getElementById("downloads-button")).x, "still clear of Downloads");
+document.getElementById("sidebar-container").style.width = "260px"; await wait(400);
+box.hidden = true;
+return result({});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);

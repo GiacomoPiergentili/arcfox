@@ -12,7 +12,6 @@ Nothing queued.
 
 ## Bigger projects
 
-- [ ] **Spaces**: several sidebars (e.g. work / personal) to switch between, as in Arc.
 
 ## Known limitations
 
@@ -22,6 +21,7 @@ Nothing queued.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
 - Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when LibreWolf quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (LibreWolf can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
+- Profile switcher: switching and creating profiles were tested with made-up profiles only (LibreWolf turns its profiles on only for profiles in its profile list, which the test profiles aren't); the layout and fitting were measured.
 - Tiles can't be split (LibreWolf keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
 - Dragging a tab in from another window is tested with simulated events only. Real drags were checked by hand-run recordings (`~/.arc-drag`, outside the repo), not in the test suite.
 - When a tab leaves the tiles mid-drag, LibreWolf sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
@@ -31,6 +31,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Spaces, as LibreWolf profiles: a profile switcher in the sidebar's bottom row; + creates a profile set up for this look.
 - [x] Start-up: tiles load when opened; the tab list fades in complete instead of popping in (no stray "New Tab" row, blank tiles or late icons).
 - [x] Peek motion: the card grows out of the clicked link once its page has drawn and shrinks back on close; no black frames (the page underneath is kept drawn), no empty card.
 - [x] Option+click a link in any tab opens it in Peek (as in Zen).
