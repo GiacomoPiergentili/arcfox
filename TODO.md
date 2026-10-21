@@ -4,12 +4,11 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Screenshots** in the README.
-- [ ] **License**: choose one (e.g. MIT) so others may reuse the code.
+- [ ] **Theme-independent sidebar color**: the auto-hide sidebar's color is measured from the pinned one (macOS's own window background, which CSS can't read). It matches with Nova Ash; with another theme, or a wallpaper that tints windows differently, it can be slightly off.
 
 ## Later
 
-- [ ] **Theme-independent sidebar color**: the auto-hide sidebar's color is measured from the pinned one (macOS's own window background, which CSS can't read). It matches with Nova Ash; with another theme, or a wallpaper that tints windows differently, it can be slightly off.
+- [ ] **Command bar screenshot with suggestions**: LibreWolf's own snapshot doesn't render the suggestion list, so the README shows the empty bar.
 
 ## Bigger projects
 
@@ -25,6 +24,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Done
 
+- [x] README screenshots (dark, light, command bar, auto-hide) and an MIT license.
 - [x] Light mode pass (Nova Ash): auto-hide sidebar color fixed for light mode; + New Tab text in the rows' color.
 - [x] Auto-archive: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`, 0 = off).
 - [x] Sidebar notice when the script isn't running (e.g. after a LibreWolf update).

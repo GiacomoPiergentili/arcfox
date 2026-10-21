@@ -4,6 +4,12 @@ An Arc-style sidebar for [LibreWolf](https://librewolf.net) on macOS, designed t
 
 LibreWolf's native vertical tabs become an Arc sidebar: the toolbar and URL bar live at the top of the sidebar, favorite **tiles** and **pinned rows** (with **folders**) sit above a divider, and normal tabs below it. Cmd+T opens a Spotlight-style command bar instead of a blank tab. Everything follows one spacing rhythm, one set of corner radii, fills and shadows, and the system accent color.
 
+![The sidebar in dark mode: tiles with the selected one in its icon's colors, pinned rows, a folder, the divider and normal tabs](docs/screenshots/sidebar-dark.png)
+
+| Light mode | Cmd+T command bar | Auto-hide sidebar |
+|---|---|---|
+| ![The sidebar in light mode](docs/screenshots/sidebar-light.png) | ![The floating command bar over a page](docs/screenshots/command-bar.png) | ![The auto-hide sidebar floating over a page](docs/screenshots/auto-hide.png) |
+
 It's two pieces:
 
 - **`userChrome.css`**: the whole look (layout, sizes, colors, motion).
@@ -111,4 +117,10 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 10. **Auto-archive**: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`).
 11. **Light mode pass**: the auto-hide sidebar now matches the pinned one in light mode too (its light color was a guess); + New Tab uses the rows' text color in every theme.
 
+12. **Screenshots and license**: README screenshots (dark, light, command bar, auto-hide); MIT license.
+
 Plans and known gaps: see [TODO.md](TODO.md).
+
+## License
+
+[MIT](LICENSE): free to use, change and share, with the copyright notice kept.
