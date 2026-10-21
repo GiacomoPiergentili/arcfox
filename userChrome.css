@@ -1445,6 +1445,100 @@ split-view-footer {
   color: inherit !important;
 }
 
+/* ---------- Split view in the sidebar ----------
+   The pair is one row, like a macOS segmented control: the same height,
+   edges and columns as the rows; a soft fill while it's on screen, a
+   stronger inset fill (concentric corners) on the page that has the focus,
+   and a hairline between the two halves when neither stands out. */
+#tabbrowser-tabs[orient="vertical"] tab-split-view-wrapper {
+  margin: calc(var(--arc-tab-gap) / 2) var(--arc-split-inset, 4px) !important;
+  padding: 0 !important;
+  border-radius: var(--arc-radius-inner) !important;
+  outline: none !important;
+  background-color: transparent !important;
+  column-gap: 0 !important;
+  /* two equal halves on whole pixels, whatever the titles */
+  grid-template-columns: round(down, 50%, 1px) minmax(0, 1fr) !important;
+
+  &[hasactivetab] {
+    background-color: var(--arc-fill-hover) !important;
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline-start: round(down, 50%, 1px);
+    inset-block: calc((var(--arc-tab-height) - 16px) / 2);
+    width: 1px;
+    margin-inline-start: -1px;
+    background: var(--arc-hairline);
+    pointer-events: none;
+    transition: opacity var(--arc-hover-duration) ease-out;
+  }
+
+  &[hasactivetab]::after,
+  &:hover::after {
+    opacity: 0;
+  }
+
+  > .tabbrowser-tab {
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: var(--arc-tab-height) !important;
+
+    .tab-stack {
+      border: none !important;
+    }
+
+    .tab-background {
+      margin: 2px !important;
+      min-height: 0 !important;
+      height: auto !important;
+      border-radius: calc(var(--arc-radius-inner) - 2px) !important;
+      background: transparent !important;
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    &:hover .tab-background {
+      background: var(--arc-fill-hover) !important;
+    }
+
+    &[selected] .tab-background {
+      background: var(--arc-fill-selected) !important;
+    }
+
+    .tab-content {
+      margin: 0 !important;
+      min-height: 0 !important;
+      height: var(--arc-tab-height) !important;
+      padding-inline: 12px 6px !important; /* icon on the rows' icon column */
+    }
+
+    .tab-group-line {
+      display: none !important;
+    }
+  }
+}
+
+/* In a folder: indented like its rows, with the folder's line */
+#tabbrowser-tabs[orient="vertical"] tab-group > tab-split-view-wrapper {
+  --arc-split-inset: 4px;
+  margin-inline-start: 12px !important;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: -4px;
+    inset-block: -3px 0;
+    width: 2px;
+    background: var(--tab-group-line-color, var(--tab-group-color));
+    pointer-events: none;
+  }
+}
+
 /* Drop zones while a tab is dragged over the page (#arc-split-drop, from the
    shortcut script): the half it would open in lights up */
 #arc-split-drop {

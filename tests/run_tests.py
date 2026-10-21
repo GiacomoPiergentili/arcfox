@@ -292,6 +292,12 @@ check(row.splitview && row.splitview === guest.splitview, "a normal tab dropped 
 const nt = R(document.getElementById("tabs-newtab-button"));
 check(row.splitview && R(row.splitview).b < nt.y, "the pair sits in the pinned block, above + New Tab");
 check(row.splitview && R(row.splitview).y > R(rows()[0]).y, "...in the row's spot");
+if (row.splitview) {
+  const w = R(row.splitview), ref = bg(rows()[0]), halves = row.splitview.tabs.map(bg);
+  check(near(w.h, 32) && near(w.x, ref.x) && near(w.r, ref.r), "the pair is one row: 32px, flush with the rows: " + JSON.stringify(w));
+  check(halves.every(h => near(h.h, 28) && Number.isInteger(h.x) && Number.isInteger(h.w)), "its halves: 28px fills on whole pixels");
+  check(near(halves[1].x - halves[0].r, 4), "4px between the halves: " + (halves[1].x - halves[0].r));
+}
 check(saved() === before, "the saved rows don't change (the guest isn't saved)");
 BrowserCommands.closeTabOrWindow(); await wait(300);  // the guest is selected
 gBrowser.selectedTab = row; await wait(600);

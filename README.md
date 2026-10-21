@@ -43,7 +43,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 
 ### Split view (as in Arc)
 - Drag a tab from the sidebar (or from another window) onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (LibreWolf's own split view underneath). LibreWolf's right-click "Add Split View" / "Open in Split View" work too.
-- The two pages are two cards 8px apart; the active one has a thin accent ring, the other shows its address in its corner. In the sidebar the pair is one item.
+- The two pages are two cards 8px apart; the active one has a thin accent ring, the other shows its address in its corner. In the sidebar the pair is one row, like a macOS segmented control: same height and edges as the rows, a soft fill while it's on screen, a stronger inset fill on the page with the focus.
 - **Pinned rows can be split**: the pair sits in the row's spot (inside its folder, too). Only the row is saved; the normal tab next to it is a guest that goes back down to the normal tabs when the two are separated. Two rows split together each keep their own place.
 - Cmd+W on a row in a split: the row leaves the pair and resets as usual; the other page stays open. Closing either half shows the other one.
 - A split of normal tabs comes back after a restart (when LibreWolf restores your tabs); a row comes back on its own.
