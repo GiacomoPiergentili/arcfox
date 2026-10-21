@@ -346,13 +346,16 @@ sidebar-main {
       background-color: var(--tab-group-color);
       transform-origin: 50% 100%;
       transform: perspective(20px) rotateX(0deg);
-      transition: transform 280ms var(--arc-ease-open), background-color 280ms var(--arc-ease-open);
+      transition: transform 280ms var(--arc-ease-open), width 280ms var(--arc-ease-open), background-color 280ms var(--arc-ease-open);
     }
   }
 }
 
 #tabbrowser-tabs[orient="vertical"][expanded] tab-group:not([collapsed]) > .tab-group-label-container .tab-group-label::after {
-  transform: perspective(20px) rotateX(-55deg) skewX(-20deg);
+  /* (a narrower front, so its tilted top ends where the back does,
+     clear of the title) */
+  width: 11px;
+  transform: perspective(20px) rotateX(-50deg) skewX(-18deg);
   background-color: color-mix(in srgb, var(--tab-group-color) 82%, white);
 }
 
