@@ -15,6 +15,7 @@
 // Normal tabs unused for a day close by themselves (arc.archiveAfterHours).
 // The auto-hide sidebar takes the pinned sidebar's measured color (theme, wallpaper).
 // Every window shows the same tiles, rows and folders, kept in sync.
+// Dragging a tab onto the page opens it in split view, on that side.
 try {
   (() => {
     const Cc = Components.classes;
@@ -1155,6 +1156,105 @@ try {
           endDrag();
         }
       }, true);
+
+      // --- split view by drag and drop (as in Arc) ---
+      // Dragging a tab from the sidebar over the page shows two drop zones
+      // (#arc-split-drop, over the page: the page itself can't receive tab
+      // drags); dropping opens it beside the current page, on that side, with
+      // LibreWolf's own split view. Normal tabs only: LibreWolf keeps tiles
+      // out of split views, and a pinned row would leave the pinned block.
+      const splitDrop = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+      splitDrop.id = "arc-split-drop";
+      for (const side of ["left", "right"]) {
+        const zone = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+        zone.setAttribute("side", side);
+        splitDrop.append(zone);
+      }
+      doc.body.append(splitDrop);
+      // Pressing on a tab already selects it, so the page shown before the
+      // press is the one to split with: it comes back under the drop zones
+      // when the drag reaches the page, and a drag dropped elsewhere leaves
+      // the dragged tab selected, as without split view.
+      let splitDragged = null;
+      let splitPartner = null;
+      let beforePress = null;
+      const canSplit = tab => !!tab && !tab.pinned && !isRow(tab) && !tab.splitview && !tab.closing &&
+        !tab.hasAttribute("arc-start-page");
+      const hideSplitDrop = () => {
+        splitDrop.removeAttribute("active");
+        splitDrop.removeAttribute("side");
+        if (splitDragged && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
+          gBrowser.selectedTab = splitDragged;
+        }
+        splitDragged = splitPartner = null;
+      };
+      gBrowser.tabContainer.addEventListener("mousedown", e => {
+        if (e.button === 0) {
+          beforePress = gBrowser.selectedTab;
+        }
+      }, true);
+      gBrowser.tabContainer.addEventListener("dragstart", e => {
+        const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+        const tab = target?.closest(".tabbrowser-tab");
+        const partner = tab === gBrowser.selectedTab ? beforePress : gBrowser.selectedTab;
+        beforePress = null;
+        if (!partner || partner === tab || !canSplit(tab) || !canSplit(partner)) {
+          return;
+        }
+        // over the page, but not over the sidebar floating above it
+        const page = doc.getElementById("tabbrowser-tabbox").getBoundingClientRect();
+        const sidebarBox = doc.querySelector("sidebar-main").getBoundingClientRect();
+        const left = Math.max(page.left, sidebarBox.width > 100 ? sidebarBox.right : 0);
+        Object.assign(splitDrop.style, {
+          left: `${left}px`,
+          top: `${page.top}px`,
+          width: `${page.right - left}px`,
+          height: `${page.height}px`,
+        });
+        splitDragged = tab;
+        splitPartner = partner;
+        splitDrop.setAttribute("active", "");
+      });
+      splitDrop.addEventListener("dragover", e => {
+        if (!splitDragged) {
+          return;
+        }
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = "move";
+        }
+        if (gBrowser.selectedTab !== splitPartner) {
+          gBrowser.selectedTab = splitPartner;
+        }
+        const box = splitDrop.getBoundingClientRect();
+        splitDrop.setAttribute("side", e.clientX < box.left + box.width / 2 ? "left" : "right");
+      });
+      splitDrop.addEventListener("dragleave", e => {
+        if (!splitDrop.contains(e.relatedTarget)) {
+          splitDrop.removeAttribute("side");
+        }
+      });
+      splitDrop.addEventListener("drop", e => {
+        const dragged = splitDragged;
+        const partner = splitPartner;
+        if (!dragged) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const onLeft = splitDrop.getAttribute("side") === "left";
+        splitDragged = splitPartner = null;
+        hideSplitDrop();
+        if (canSplit(dragged) && canSplit(partner)) {
+          try {
+            gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
+            gBrowser.selectedTab = dragged;
+          } catch (err) {
+            console.error("Arc sidebar (split view):", err);
+          }
+        }
+      });
+      win.addEventListener("dragend", hideSplitDrop, true);
 
       // --- closing a pinned row or tile resets it instead ---
       // It goes back to its pinned page, unloaded (except when its whole

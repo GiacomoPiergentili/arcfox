@@ -41,6 +41,11 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Launch and new windows start with that bar over an empty page instead of a blank tab.
 - No stray blank tabs: double-clicking empty sidebar space does nothing; Cmd+W on the empty page does nothing.
 
+### Split view (as in Arc)
+- Drag a tab from the sidebar onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (LibreWolf's own split view underneath).
+- The two pages are two cards 8px apart; the active one has a thin accent ring, the other shows its address in its corner. In the sidebar the pair is one item.
+- Normal tabs only: tiles and pinned rows stay out of split views.
+
 ### Closing
 - Closing a row or tile resets it (back to its pinned page, unloaded) instead of closing it.
 - After closing a row, a tile or the last normal tab you go to the most recently used open row, else the empty page with the bar, never to an unloaded row that would start loading.
@@ -106,7 +111,7 @@ Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`:
 python3 tests/run_tests.py
 ```
 
-Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
+Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
 
 ## What's been done
 
@@ -130,6 +135,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 13. **Auto-hide sidebar color**: measured from the pinned sidebar on theme, appearance and wallpaper changes (`arc.sidebarColor.dark` / `.light`).
 14. **Video fullscreen, accessibility, tests**: videos fill the screen; the custom buttons have VoiceOver names; a regression test suite, which right away caught fresh installs fitting only 2 tiles per row (the sidebar's contents were narrower than the sidebar until its edge was dragged once).
 15. **Multiple windows**: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
+16. **Split view by drag and drop** (as in Arc): drop a tab on the left or right half of the page to see both side by side.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

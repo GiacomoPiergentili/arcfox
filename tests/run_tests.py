@@ -236,6 +236,43 @@ await wait(800);
 return result({selectedAfter: gBrowser.selectedTab.label});
 """),
 
+    ("split view: drag a tab onto the page", r"""
+const a = gBrowser.addTab(page("Split A"), {triggeringPrincipal: P});
+const b = gBrowser.addTab(page("Split B"), {triggeringPrincipal: P});
+gBrowser.selectedTab = a; await wait(800);
+const ov = document.getElementById("arc-split-drop");
+const drag = (tab, type, x = 0.5) => { const box = ov.getBoundingClientRect();
+  const e = new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: box.x + box.width * x, clientY: box.y + 100});
+  (type === "dragstart" ? tab : ov.lastElementChild).dispatchEvent(e); return e; };
+drag(rows()[0], "dragstart");
+check(!ov.hasAttribute("active"), "a pinned row can't be split");
+window.dispatchEvent(new DragEvent("dragend"));
+gBrowser.selectedTab = a; await wait(300);
+b.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, button: 0}));
+gBrowser.selectedTab = b; await wait(300);  // pressing on a tab selects it
+drag(b, "dragstart");
+check(ov.hasAttribute("active"), "dragging a tab shows the drop zones");
+const tb = R(document.getElementById("tabbrowser-tabbox")), o = R(ov);
+check(near(o.x, tb.x) && near(o.w, tb.w) && near(o.h, tb.h), "the drop zones cover the page");
+check(drag(b, "dragover", 0.25).defaultPrevented && ov.getAttribute("side") === "left", "the left half lights up");
+check(gBrowser.selectedTab === a, "the page shown before the press is back under the drop zones");
+drag(b, "drop", 0.25); await wait(800);
+check(!ov.hasAttribute("active"), "the drop zones hide after the drop");
+check(a.splitview && a.splitview === b.splitview, "the two tabs are in a split view");
+const order = gBrowser.tabs.filter(t => t.splitview);
+check(order[0] === b && order[1] === a, "the dragged tab is on the side it was dropped on");
+const panes = [...document.querySelectorAll("#tabbrowser-tabpanels .split-view-panel")].map(R).sort((p, q) => p.x - q.x);
+const tp = R(document.getElementById("tabbrowser-tabpanels"));
+check(panes.length === 2, "two pages on screen");
+if (panes.length === 2) {
+  check(near(panes[1].x - panes[0].r, 8), "8px between the pages: " + (panes[1].x - panes[0].r).toFixed(1));
+  check(near(panes[0].x, tp.x) && near(panes[1].r, tp.r), "the pages are flush with the gutter");
+  check(near(panes[0].w, panes[1].w, 1), "the pages are the same width");
+}
+gBrowser.removeTabs([a, b], {animate: false}); await wait(500);
+return result({panes});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);

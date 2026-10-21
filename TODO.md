@@ -14,7 +14,6 @@ Nothing queued.
 
 - [ ] **Spaces**: several sidebars (e.g. work / personal) to switch between, as in Arc.
 - [ ] **Peek**: links opened from a tile show in a floating preview window instead of replacing the tile's page.
-- [ ] **Split view by drag and drop**: drag a tab onto another to see both side by side. LibreWolf 158 has a built-in split view to build on (it needs a gesture and the Arc/Apple styling). To decide: since dropping onto a tab already means "reorder", the gesture could be dropping onto the left or right side of the page (as in Arc) or holding the tab over another one for a moment.
 
 ## Known limitations
 
@@ -23,10 +22,12 @@ Nothing queued.
 - The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
+- Split view is for normal tabs only (LibreWolf keeps tiles out of split views; a row in one would leave the pinned block). Dropping a tab onto another tab in the sidebar still reorders, as before.
 - `restoreRows` still converts rows saved by an early version (when rows were LibreWolf pinned tabs); it doubles as crash recovery, so it stays.
 
 ## Done
 
+- [x] Split view by drag and drop (as in Arc): drop a tab on the left or right half of the page.
 - [x] Multiple windows: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
 - [x] Test suite (`python3 tests/run_tests.py`). It found fresh installs fitting only 2 tiles per row: fixed (the sidebar's contents now always fill it).
 - [x] Video fullscreen fills the screen (no page-card gutter, corners or shadow).

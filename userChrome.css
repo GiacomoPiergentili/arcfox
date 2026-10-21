@@ -1406,3 +1406,66 @@ panel toolbarseparator {
     transition-timing-function: var(--arc-ease-open);
   }
 }
+
+/* ---------- Split view (as in Arc) ----------
+   Two pages side by side are two cards, 8px apart and flush with the
+   gutter; the page card's own frame steps back. The active page has a thin
+   accent ring. The divider stays an (invisible) resize handle. */
+#tabbrowser-tabpanels[splitview] {
+  overflow: visible !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-panel {
+  margin: 0 !important;
+  border-radius: var(--arc-radius) !important;
+  box-shadow: var(--arc-shadow-2) !important;
+  overflow: clip !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-panel.deck-selected {
+  outline: 2px solid var(--arc-focus-ring) !important;
+  outline-offset: 0 !important;
+}
+
+#tabbrowser-tabpanels[splitview] .split-view-splitter {
+  width: var(--arc-gap) !important;
+  min-width: var(--arc-gap) !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* the other page's address, in the corner of its card */
+split-view-footer {
+  background-color: var(--arc-panel) !important;
+  color: inherit !important;
+}
+
+/* Drop zones while a tab is dragged over the page (#arc-split-drop, from the
+   shortcut script): the half it would open in lights up */
+#arc-split-drop {
+  position: fixed;
+  z-index: 15;
+  display: none;
+  gap: var(--arc-gap);
+
+  &[active] {
+    display: flex;
+  }
+
+  > div {
+    flex: 1;
+    border-radius: var(--arc-radius);
+    transition: background-color var(--arc-hover-duration) ease-out;
+  }
+
+  &[side="left"] > [side="left"],
+  &[side="right"] > [side="right"] {
+    background-color: color-mix(in srgb, AccentColor 16%, transparent);
+    outline: 2px solid var(--arc-focus-ring);
+    outline-offset: -2px;
+  }
+}
