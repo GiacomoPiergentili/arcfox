@@ -24,5 +24,6 @@ fi
 mkdir -p "$PREFDIR"
 cp "$HERE/arc-shortcut-prefs.js" "$PREFDIR/arc-shortcut-prefs.js"
 printf '\n' >> "$CFG"
-cat "$HERE/shortcut.cfg.js" >> "$CFG"
+# (the repo's folder, for profiles that don't have the look yet)
+sed "s|__ARC_CHROME_DIR__|${HERE:h}|" "$HERE/shortcut.cfg.js" >> "$CFG"
 echo "Installed. Quit LibreWolf (Cmd+Q) and reopen it."

@@ -32,6 +32,9 @@ try {
     defaults.setBoolPref("browser.tabs.dragDrop.createGroup.enabled", false);
     // Auto-archive (see below): hours a normal tab may stay unused; 0 = off
     const ARCHIVE_PREF = "arc.archiveAfterHours";
+    // This repo's folder (the look), filled in by install.sh: a profile
+    // without it gets it linked as its chrome folder on its first run
+    const ARC_CHROME_DIR = "__ARC_CHROME_DIR__";
     defaults.setIntPref(ARCHIVE_PREF, 24);
     // Tiles load when first opened, like the pinned rows: loading every
     // tile's page at launch made start-up slow and busy (and left the tiles
@@ -120,8 +123,41 @@ try {
         setIfDefault("browser.newtabpage.enabled", false);
         setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
         setIfDefault("sidebar.new-sidebar.has-used", true);
-        setIfDefault("sidebar.main.tools", "bookmarks,history"); // the bottom row's left buttons
         prefs.setBoolPref("arc.profileDefaultsApplied", true);
+        // A profile without the look (made from LibreWolf's Profiles menu):
+        // its chrome folder becomes a link to this repo, and the settings
+        // that load it go on; it shows from the next start (offered below)
+        try {
+          const chrome = win.Services.dirsvc.get("UChrm", Ci.nsIFile);
+          const sheet = chrome.clone();
+          sheet.append("userChrome.css");
+          if (!sheet.exists() && !ARC_CHROME_DIR.startsWith("__")) {
+            if (chrome.exists() && chrome.isDirectory() && !chrome.directoryEntries.hasMoreElements()) {
+              chrome.remove(false);
+            }
+            if (!chrome.exists()) {
+              const ln = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+              ln.initWithPath("/bin/ln");
+              const proc = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
+              proc.init(ln);
+              proc.run(true, ["-s", ARC_CHROME_DIR, chrome.path], 3);
+            }
+            for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+              prefs.setBoolPref(name, true);
+            }
+            win.setTimeout(() => {
+              win.gNotificationBox?.appendNotification("arc-restart", {
+                label: "This profile is set up for the Arc sidebar. Restart LibreWolf to see it.",
+                priority: win.gNotificationBox.PRIORITY_INFO_HIGH,
+              }, [{
+                label: "Restart",
+                callback: () => win.Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart),
+              }]);
+            }, 1500);
+          }
+        } catch (e) {
+          console.error("Arc sidebar (profile set-up):", e);
+        }
       }
       // Reuse the existing Cmd+S key: detach it from "Save Page" and run our toggle instead
       const key = doc.getElementById("key_savePage");
@@ -155,12 +191,13 @@ try {
       if (sidebarMain) {
         win.customElements.whenDefined("sidebar-main").then(() => sidebarMain.updateComplete).then(() => {
           const style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
-          // The remaining buttons (Bookmarks, History) get the style of every
-          // other icon button: 8px corners and the tab rows' hover / pressed
-          // fills instead of round, accent-tinted ones, 34px apart, the first
-          // icon in line with the tab icons
+          // LibreWolf's tool buttons (Bookmarks, History...) aren't shown: the
+          // bottom row has Downloads, the profile switcher and Extensions.
+          // They keep their row's height (so the tab list stops above it), and
+          // the style of every other icon button should one come back.
           style.textContent = `
             moz-button[view="viewCustomizeSidebar"], .more-tools-button { display: none !important; }
+            .tools-and-extensions moz-button { visibility: hidden !important; }
             .tools-and-extensions { gap: 4px !important; padding-inline-start: 9px !important; }
             .tools-and-extensions moz-button {
               --button-size-icon: 30px !important; /* LibreWolf sizes them from the tab height */
@@ -2180,38 +2217,28 @@ try {
 
       // --- profile switcher (Arc's Space switcher, with LibreWolf profiles) ---
       // In the middle of the sidebar's bottom row: the profiles' avatars
-      // (up to three, the current one highlighted; hover for the name) and a
-      // +. A click on another profile brings its window forward (or starts
-      // it); + creates a profile set up for this look (its chrome folder
-      // linked to this one, the settings it needs) and opens it on
-      // LibreWolf's "customize your profile" page. Hidden in private windows
-      // and when LibreWolf's profiles are off.
+      // (as many as fit, the current one always; hover for the name). A
+      // click on another profile brings its window forward (or starts it).
+      // New profiles are made from LibreWolf's Profiles menu (and set up on
+      // their first run, see above). Hidden in private windows and when
+      // LibreWolf's profiles are off.
       const profilesBox = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
       profilesBox.id = "arc-profiles";
       profilesBox.hidden = true;
       doc.getElementById("downloads-button")?.after(profilesBox);
       let profileService = null;
       try {
-        ({ SelectableProfileService: profileService } = ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
+        ({ SelectableProfileService: profileService } = win.ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
       } catch {}
-      // As many avatars as fit between the bottom row's buttons (centered,
-      // 4px clear of them; 24px buttons 4px apart, the + included): fewer in
-      // a narrow sidebar, always the current one
+      // As many as fit between Downloads and Extensions (centered, 4px clear
+      // of them; 24px avatars 4px apart): fewer in a narrow sidebar
       const maxProfiles = () => {
         const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
-        // Bookmarks / History end 77px in, Downloads starts 76px from the end
-        const room = width - 2 * 81;
-        return Math.max(1, Math.floor((room + 4) / 28) - 1);
+        // Downloads ends 43px in, Extensions starts 42px from the end
+        const room = width - 2 * 47;
+        return Math.max(1, Math.floor((room + 4) / 28));
       };
       let lastProfiles = null;
-      const profileButton = (label, onClick) => {
-        const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
-        b.className = "arc-profile";
-        b.title = label;
-        b.setAttribute("aria-label", label);
-        b.addEventListener("click", onClick);
-        return b;
-      };
       // (list, current): also called by the tests with made-up profiles
       const renderProfiles = async (list, current) => {
         lastProfiles = [list, current];
@@ -2229,7 +2256,11 @@ try {
         const buttons = [];
         for (const p of shown) {
           const isCurrent = p.id === current?.id;
-          const b = profileButton(p.name, () => !isCurrent && profileService?.launchInstance(p));
+          const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
+          b.className = "arc-profile";
+          b.title = p.name;
+          b.setAttribute("aria-label", p.name);
+          b.addEventListener("click", () => !isCurrent && profileService?.launchInstance(p));
           b.toggleAttribute("current", isCurrent);
           if (isCurrent) {
             b.setAttribute("aria-current", "true");
@@ -2250,15 +2281,24 @@ try {
           b.append(img);
           buttons.push(b);
         }
-        const add = profileButton("New Profile", () => createProfile());
-        add.classList.add("arc-profile-new");
-        buttons.push(add);
         profilesBox.replaceChildren(...buttons);
-        profilesBox.hidden = false;
+        // (one profile alone has nothing to switch to)
+        profilesBox.hidden = buttons.length < 2;
       };
       profilesBox._arcRender = renderProfiles;
       const refreshProfiles = async () => {
-        if (isPrivate || !profileService?.isEnabled) {
+        if (isPrivate || !profileService) {
+          profilesBox.hidden = true;
+          return;
+        }
+        // LibreWolf's profile service starts up in its own time: at launch it
+        // had no profiles to give yet
+        try {
+          if (!profileService.initialized) {
+            await profileService.init();
+          }
+        } catch {}
+        if (!profileService.isEnabled) {
           profilesBox.hidden = true;
           return;
         }
@@ -2268,47 +2308,24 @@ try {
         } catch {}
         renderProfiles(list, profileService.currentProfile);
       };
-      // A new profile, set up for this look before its first start
-      const setUpProfile = async dir => {
-        const chrome = win.Services.dirsvc.get("UChrm", Ci.nsIFile);
-        const source = chrome.isSymlink() ? chrome.target : chrome.path;
-        const link = win.PathUtils.join(dir, "chrome");
-        if (!(await win.IOUtils.exists(link))) {
-          const ln = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-          ln.initWithPath("/bin/ln");
-          const proc = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
-          proc.init(ln);
-          proc.run(true, ["-s", source, link], 3);
-        }
-        const prefsFile = win.PathUtils.join(dir, "prefs.js");
-        let text = (await win.IOUtils.exists(prefsFile)) ? await win.IOUtils.readUTF8(prefsFile) : "";
-        for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
-          if (!text.includes(`"${name}"`)) {
-            text += `user_pref("${name}", true);\n`;
-          }
-        }
-        await win.IOUtils.writeUTF8(prefsFile, text);
-      };
-      const createProfile = async () => {
-        try {
-          const profile = await profileService.createNewProfile(false);
-          await setUpProfile(profile.path);
-          profileService.launchInstance(profile, ["about:newprofile"]);
-        } catch (e) {
-          console.error("Arc sidebar (new profile):", e);
-        }
-      };
       if (!isPrivate && profileService) {
         const profilesObserver = { observe: () => refreshProfiles() };
         win.Services.obs.addObserver(profilesObserver, "sps-profiles-updated");
-        win.addEventListener("unload", () => win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated"), { once: true });
+        const onEnable = () => refreshProfiles();
+        profileService.on?.("enableChanged", onEnable);
+        win.addEventListener("unload", () => {
+          win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated");
+          profileService.off?.("enableChanged", onEnable);
+        }, { once: true });
         refreshProfiles();
+        // (and once LibreWolf has settled, in case it was still busy)
+        SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(refreshProfiles, 1000));
       }
       // the sidebar resized: recount what fits
       let profilesFit = maxProfiles();
       new win.ResizeObserver(() => {
         const fit = maxProfiles();
-        if (fit !== profilesFit && lastProfiles && !profilesBox.hidden) {
+        if (fit !== profilesFit && lastProfiles) {
           profilesFit = fit;
           renderProfiles(...lastProfiles);
         }

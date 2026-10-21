@@ -22,16 +22,16 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 ### Layout
 - Toolbar and URL bar on top of the sidebar; the page is a floating card with an 8px gutter on every side.
 - Window buttons, then a **sidebar button** (show / auto-hide, same as Cmd+S); back, forward, reload at the right.
-- Bottom row: Bookmarks, History, Downloads, Extensions. No ☰ menu (everything in it is in the macOS menu bar) and no "Customize sidebar" gear.
+- Bottom row: Downloads at the left, the profile switcher in the middle, Extensions at the right (bookmarks and history are in the menu bar). No ☰ menu (everything in it is in the macOS menu bar) and no "Customize sidebar" gear.
 - **Auto-hide mode**: the sidebar slides in over the page when the pointer reaches the window's left edge (Apple-style curves); the URL bar then floats in the middle of the window, Spotlight-style. Its color is measured from the pinned sidebar, so it matches with any theme or wallpaper.
 - Fullscreen: the sidebar and toolbar keep working when the macOS menu bar slides in.
 - Start-up: the tab list appears complete (tiles, rows, folders, icons) with a short fade, instead of popping in piece by piece; the command bar appears straight in the middle (never in the sidebar first).
 
 ### Profiles (Arc's Spaces)
 - LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
-- **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one ringed; hover for the name), as many as fit. Click one to bring its window forward (or start it).
-- **+** creates a profile already set up for this look (its `chrome` folder linked to this one, the settings it needs) and opens it on LibreWolf's page to name it and pick an avatar and color.
-- Any profile's first run with the script gives it, once, the settings the layout relies on (no bookmarks toolbar, a blank start page, no new tab page content, Bookmarks and History in the bottom row); what you change afterwards stays.
+- **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one ringed; hovering one lights it up on a soft round fill, with its name), as many as fit. Click one to bring its window forward (or start it). Shown once there are two profiles.
+- New profiles are made from LibreWolf's Profiles menu. On a profile's first run, if it doesn't have the look yet, its `chrome` folder is linked to this repo (`install.sh` records where it is) and the settings that load it are turned on; a bar offers to restart, since the look loads at startup.
+- Any profile's first run with the script gives it, once, the settings the layout relies on (no bookmarks toolbar, a blank start page, no new tab page content); what you change afterwards stays.
 
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
 - **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
@@ -159,7 +159,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 19. **Drag torture test** (random circles in and out of the sidebar, detours over the page, every kind of item, checked against a list of invariants afterwards): a drag that left the sidebar was treated as over, so coming back left tabs squeezed and fighting LibreWolf's own drag state; a tab dropped on its own page was torn off into a new window; a tile dropped inside a folder landed outside it.
 20. **Peek** (as in Arc): links to other sites from tiles and pinned rows open in a floating card over the pinned page; open as tab, split, or close.
 21. **Start-up**: recorded at 60 fps: a stray "New Tab" row, blank tiles and icons arriving one by one for about a second. Tiles now come back unloaded (loading three heavy sites at launch was most of the wait), and the tab list stays hidden until it's complete, then fades in.
-22. **Profile switcher**: LibreWolf profiles as Arc's Spaces, switched from the bottom of the sidebar; new profiles come set up for this look.
+22. **Profile switcher**: LibreWolf profiles as Arc's Spaces, switched from the bottom of the sidebar; new profiles get this look on their first run.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

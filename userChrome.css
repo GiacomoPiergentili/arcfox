@@ -766,9 +766,9 @@ sidebar-main {
   display: none !important;
 }
 
-/* Downloads and Extensions: at the right end of the sidebar's bottom row
-   (Bookmarks, History), sized and spaced like every icon button (30px, 34px
-   apart); the last one's icon is in line with the tabs' close buttons. They
+/* Downloads and Extensions: at the two ends of the sidebar's bottom row
+   (LibreWolf's tool buttons there are hidden), sized like every icon button
+   (30px); Extensions' icon is in line with the tabs' close buttons. They
    stay in the toolbar, so they hide and slide together with it; the toolbar
    starts at the window's top, so 100vh is the sidebar's bottom edge. */
 :is(#downloads-button, #unified-extensions-button) {
@@ -780,8 +780,11 @@ sidebar-main {
   padding: 0 !important;
 }
 
+/* Downloads at the left end (its icon in line with the tab icons),
+   Extensions at the right, the profile switcher between them */
 #downloads-button {
-  right: 46px !important;
+  left: 13px !important;
+  right: auto !important;
 }
 
 :is(#downloads-button, #unified-extensions-button) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
@@ -1777,16 +1780,16 @@ split-view-footer {
 }
 
 /* No bookmarks toolbar: there's no room for it in the sidebar (bookmarks
-   are in the bottom row's Bookmarks button and the menu bar) */
+   are in the menu bar and the Library window) */
 #PersonalToolbar {
   display: none !important;
 }
 
 /* ---------- Profile switcher ----------
-   In the middle of the sidebar's bottom row, between Bookmarks / History
-   and Downloads / Extensions (#arc-profiles, from the shortcut script): the
-   profiles' avatars in their own colors, the current one highlighted, and
-   a + for a new profile. */
+   In the middle of the sidebar's bottom row, between Downloads and
+   Extensions (#arc-profiles, from the shortcut script): the profiles'
+   avatars in their own colors, the current one ringed. Hovering one lights
+   it up on a soft round fill; pressing it gives a little. */
 #arc-profiles {
   position: absolute !important;
   top: calc(100vh - 36.5px - var(--fullscreen-menubar-shift, 0px));
@@ -1816,9 +1819,25 @@ split-view-footer {
     background: transparent;
     color: inherit;
     opacity: 0.55;
-    transition: opacity var(--arc-hover-duration) ease-out, background-color var(--arc-hover-duration) ease-out;
+    transition: opacity var(--arc-hover-duration) ease-out, background-color var(--arc-hover-duration) ease-out, box-shadow var(--arc-hover-duration) ease-out, scale 120ms ease-out;
 
+    /* (the fill shows as a ring round the avatar, reaching halfway into
+       the gap to the next one) */
     &:hover {
+      opacity: 1;
+      background-color: var(--arc-fill-hover);
+      box-shadow: 0 0 0 2px var(--arc-fill-hover);
+    }
+
+    &:hover:active {
+      scale: 0.9;
+      background-color: var(--arc-fill-selected);
+      box-shadow: 0 0 0 2px var(--arc-fill-selected);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--arc-focus-ring);
+      outline-offset: 1px;
       opacity: 1;
     }
 
@@ -1833,22 +1852,6 @@ split-view-footer {
       -moz-context-properties: fill, stroke;
       fill: var(--arc-profile-bg, currentColor);
       stroke: var(--arc-profile-fg, Canvas);
-    }
-  }
-
-  > .arc-profile-new {
-    border-radius: var(--arc-radius-inner);
-
-    &:hover {
-      background-color: var(--arc-fill-hover);
-    }
-
-    &::before {
-      content: "";
-      width: 14px;
-      height: 14px;
-      background-color: currentColor;
-      mask: url("chrome://global/skin/icons/plus.svg") center / contain no-repeat;
     }
   }
 }

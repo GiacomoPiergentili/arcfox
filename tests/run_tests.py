@@ -134,7 +134,8 @@ TESTS = [
     ("script is installed and running", r"""
 check(root.hasAttribute("arc-script"), "the window isn't marked [arc-script]: run arc-shortcut/install.sh");
 check(Services.prefs.getBoolPref("arc.profileDefaultsApplied", false), "a new profile gets the settings the layout relies on");
-check(Services.prefs.getStringPref("browser.toolbars.bookmarks.visibility", "") === "never" && Services.prefs.getStringPref("sidebar.main.tools", "") === "bookmarks,history", "...bookmarks toolbar off, Bookmarks and History in the bottom row");
+check(Services.prefs.getStringPref("browser.toolbars.bookmarks.visibility", "") === "never", "...bookmarks toolbar off");
+check(!gNotificationBox.getNotificationWithValue("arc-restart"), "a profile that has the look isn't asked to restart");
 return result({});
 """),
 
@@ -358,20 +359,28 @@ return result({});
     ("profile switcher: bottom row, centered", r"""
 const box = document.getElementById("arc-profiles");
 check(box && box.hidden, "hidden when LibreWolf's profiles are off (a test profile isn't registered)");
-const fake = [1, 2, 3, 4].map(i => ({id: i, name: "P" + i, avatar: "book", hasCustomAvatar: false, theme: {themeBg: "rgb(120, 190, 255)", themeFg: "rgb(0, 30, 60)"}}));
-await box._arcRender(fake, fake[3]); await wait(300);
-const sb = R(document.querySelector("sidebar-main")), dl = R(document.getElementById("downloads-button"));
+const fake = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => ({id: i, name: "P" + i, avatar: "book", hasCustomAvatar: false, theme: {themeBg: "rgb(120, 190, 255)", themeFg: "rgb(0, 30, 60)"}}));
+await box._arcRender(fake, fake[8]); await wait(300);
+const sb = R(document.querySelector("sidebar-main")), dl = R(document.getElementById("downloads-button")), ext = R(document.getElementById("unified-extensions-button"));
 const b = [...box.children].map(R);
-check(box.children.length >= 2 && box.querySelector(".arc-profile-new"), "profiles and a +: " + box.children.length);
-check([...box.children].some(c => c.hasAttribute("current") && c.title === "P4"), "the current profile is always shown, and marked");
+check(box.children.length >= 2 && box.children.length < 9 && !box.querySelector(".arc-profile-new"), "as many profiles as fit, no +: " + box.children.length);
+check([...box.children].some(c => c.hasAttribute("current") && c.title === "P9"), "the current profile is always shown, and marked");
 check(Math.abs((b[0].x + b.at(-1).r) / 2 - (sb.x + sb.w / 2)) <= 1, "centered in the sidebar");
 check(b.every(x => Number.isInteger(x.x)), "on whole pixels");
 check(near(b[0].y + b[0].h / 2, dl.y + dl.h / 2, 1), "in line with Downloads");
-check(b.at(-1).r < dl.x, "clear of Downloads");
+check(dl.x - sb.x < 20 && sb.r - ext.r < 20, "Downloads at the left end, Extensions at the right");
+check(b[0].x > dl.r && b.at(-1).r < ext.x, "between them, clear of both");
+const tools = [...(document.querySelector("sidebar-main").shadowRoot?.querySelectorAll(".tools-and-extensions moz-button") || [])];
+check(tools.every(t => getComputedStyle(t).visibility === "hidden"), "LibreWolf's tool buttons (Bookmarks, History) aren't shown: " + tools.length);
+const avatar = box.firstElementChild;
+InspectorUtils.addPseudoClassLock(avatar, ":hover"); await wait(300);
+const hov = getComputedStyle(avatar);
+check(hov.opacity === "1" && hov.backgroundColor !== "rgba(0, 0, 0, 0)", "a hovered avatar lights up on a round fill: " + hov.backgroundColor);
+InspectorUtils.clearPseudoClassLocks(avatar);
 const wide = box.children.length;
 document.getElementById("sidebar-container").style.width = "300px"; await wait(400);
 check(box.children.length > wide, "a wider sidebar fits more: " + wide + " -> " + box.children.length);
-check(R(box.lastElementChild).r < R(document.getElementById("downloads-button")).x, "still clear of Downloads");
+check(R(box.lastElementChild).r < R(document.getElementById("unified-extensions-button")).x && R(box.firstElementChild).x > R(document.getElementById("downloads-button")).r, "still clear of both");
 document.getElementById("sidebar-container").style.width = "260px"; await wait(400);
 box.hidden = true;
 return result({});
