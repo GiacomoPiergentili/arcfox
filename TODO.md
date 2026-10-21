@@ -22,11 +22,15 @@ Nothing queued.
 - The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
-- Split view is for normal tabs only (LibreWolf keeps tiles out of split views; a row in one would leave the pinned block). Dropping a tab onto another tab in the sidebar still reorders, as before.
+- Tiles can't be split (LibreWolf keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
+- A split view's sidebar item is LibreWolf's own (42px tall, vs 32px rows); not restyled yet.
+- Dragging a tab in from another window and a real mouse drag are tested with simulated events only.
+- LibreWolf's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
 - `restoreRows` still converts rows saved by an early version (when rows were LibreWolf pinned tabs); it doubles as crash recovery, so it stays.
 
 ## Done
 
+- [x] Split view, every way in: pinned rows can be split (pair in the row's spot, only the row saved), right-click split and its "choose a tab" picker, restored split views, tabs from another window, Cmd+W on a row in a split.
 - [x] Split view by drag and drop (as in Arc): drop a tab on the left or right half of the page.
 - [x] Multiple windows: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
 - [x] Test suite (`python3 tests/run_tests.py`). It found fresh installs fitting only 2 tiles per row: fixed (the sidebar's contents now always fill it).

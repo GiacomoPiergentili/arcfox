@@ -280,8 +280,9 @@ sidebar-main {
 /* ---------- Pinned rows and folders (Arc's "pinned tabs") ----------
    Normal tabs marked [arc-pinned-row] by the shortcut script (Cmd+D) and
    folders (LibreWolf's tab groups) form one block at the top of the tab
-   list. Below it: the divider, + New Tab, then the other tabs (Arc's order). */
-#tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab[arc-pinned-row], tab-group, tab-group > *) {
+   list. Below it: the divider, + New Tab, then the other tabs (Arc's order).
+   A split view with a row in it sits in the block too, in the row's spot. */
+#tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab[arc-pinned-row], tab-group, tab-group > *, tab-split-view-wrapper:has(> .tabbrowser-tab[arc-pinned-row])) {
   order: -2;
 }
 

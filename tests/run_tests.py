@@ -244,8 +244,8 @@ const ov = document.getElementById("arc-split-drop");
 const drag = (tab, type, x = 0.5) => { const box = ov.getBoundingClientRect();
   const e = new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: box.x + box.width * x, clientY: box.y + 100});
   (type === "dragstart" ? tab : ov.lastElementChild).dispatchEvent(e); return e; };
-drag(rows()[0], "dragstart");
-check(!ov.hasAttribute("active"), "a pinned row can't be split");
+drag(tiles()[0], "dragstart");
+check(!ov.hasAttribute("active"), "a tile can't be split");
 window.dispatchEvent(new DragEvent("dragend"));
 gBrowser.selectedTab = a; await wait(300);
 b.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, button: 0}));
@@ -271,6 +271,40 @@ if (panes.length === 2) {
 }
 gBrowser.removeTabs([a, b], {animate: false}); await wait(500);
 return result({panes});
+"""),
+
+    ("split view with a pinned row: in its spot, saved, Cmd+W", r"""
+const saved = () => Services.prefs.getStringPref("arc.pinnedRows", "");
+const before = saved();
+const row = rows()[1], guest = gBrowser.addTab(page("Guest"), {triggeringPrincipal: P});
+await wait(500);
+gBrowser.selectedTab = row; await wait(600);
+const ov = document.getElementById("arc-split-drop");
+const dt = new DataTransfer(); dt.mozSetDataAt("application/x-moz-tabbrowser-tab", guest, 0);
+const at = (type, target) => { const box = ov.getBoundingClientRect();
+  target.dispatchEvent(new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: dt, clientX: box.x + box.width * 0.75, clientY: box.y + 100})); };
+guest.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, button: 0}));
+gBrowser.selectedTab = guest; await wait(300);  // pressing on a tab selects it
+at("dragstart", guest); at("dragover", ov.lastElementChild); at("drop", ov.lastElementChild);
+dt.dropEffect = "move"; at("dragend", guest);
+await wait(1500);
+check(row.splitview && row.splitview === guest.splitview, "a normal tab dropped on a row's page splits with it");
+const nt = R(document.getElementById("tabs-newtab-button"));
+check(row.splitview && R(row.splitview).b < nt.y, "the pair sits in the pinned block, above + New Tab");
+check(row.splitview && R(row.splitview).y > R(rows()[0]).y, "...in the row's spot");
+check(saved() === before, "the saved rows don't change (the guest isn't saved)");
+BrowserCommands.closeTabOrWindow(); await wait(300);  // the guest is selected
+gBrowser.selectedTab = row; await wait(600);
+const g2 = gBrowser.addTab(page("Guest 2"), {triggeringPrincipal: P}); await wait(500);
+gBrowser.addTabSplitView([row, g2]); await wait(800);
+gBrowser.selectedTab = row; await wait(500);
+BrowserCommands.closeTabOrWindow(); await wait(1500);
+check(!row.splitview && isRow(row) && row.isConnected, "Cmd+W on the row: it leaves the split view and stays a row");
+check(gBrowser.selectedTab === g2, "...and the other page stays on screen");
+check(R(g2).y > nt.y, "...which goes back down to the normal tabs");
+check(saved() === before, "the saved rows are as before");
+gBrowser.removeTab(g2, {animate: false}); await wait(500);
+return result({});
 """),
 
     ("auto-hide mode: tiles stay a centered grid", r"""

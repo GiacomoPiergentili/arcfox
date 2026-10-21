@@ -42,9 +42,12 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - No stray blank tabs: double-clicking empty sidebar space does nothing; Cmd+W on the empty page does nothing.
 
 ### Split view (as in Arc)
-- Drag a tab from the sidebar onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (LibreWolf's own split view underneath).
+- Drag a tab from the sidebar (or from another window) onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (LibreWolf's own split view underneath). LibreWolf's right-click "Add Split View" / "Open in Split View" work too.
 - The two pages are two cards 8px apart; the active one has a thin accent ring, the other shows its address in its corner. In the sidebar the pair is one item.
-- Normal tabs only: tiles and pinned rows stay out of split views.
+- **Pinned rows can be split**: the pair sits in the row's spot (inside its folder, too). Only the row is saved; the normal tab next to it is a guest that goes back down to the normal tabs when the two are separated. Two rows split together each keep their own place.
+- Cmd+W on a row in a split: the row leaves the pair and resets as usual; the other page stays open. Closing either half shows the other one.
+- A split of normal tabs comes back after a restart (when LibreWolf restores your tabs); a row comes back on its own.
+- Tiles stay out: LibreWolf can't put its pinned tabs in a split view.
 
 ### Closing
 - Closing a row or tile resets it (back to its pinned page, unloaded) instead of closing it.
@@ -136,6 +139,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 14. **Video fullscreen, accessibility, tests**: videos fill the screen; the custom buttons have VoiceOver names; a regression test suite, which right away caught fresh installs fitting only 2 tiles per row (the sidebar's contents were narrower than the sidebar until its edge was dragged once).
 15. **Multiple windows**: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
 16. **Split view by drag and drop** (as in Arc): drop a tab on the left or right half of the page to see both side by side.
+17. **Split view, every way in**: all 27 ways a split can start were tested; pinned rows can now be split (the pair stays in the row's spot, the saved list never changes), LibreWolf's "choose a tab" picker and restored split views work (our new-tab handling used to pull their tabs out), tabs can come from another window, and Cmd+Shift+D to un-tile puts the tab below the rows instead of above them.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

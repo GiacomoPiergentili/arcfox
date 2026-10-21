@@ -127,6 +127,43 @@ try {
       const ROWS_PREF = "arc.pinnedRows";
       const isRow = tab => tab.hasAttribute(ROW);
       const isGroup = el => el?.localName === "tab-group";
+      // Split views (two pages side by side) are LibreWolf's
+      // <tab-split-view-wrapper>s. One with a pinned row in it is part of the
+      // pinned block, in the row's spot; the normal tab next to the row is a
+      // guest ([arc-split-guest]): never saved, and back with the normal tabs
+      // once the two are separated.
+      const isSplit = el => el?.localName === "tab-split-view-wrapper";
+      const hasRow = split => split.tabs.some(isRow);
+      const GUEST = "arc-split-guest";
+      // A split view of two rows sits in the first one's spot. The other one
+      // keeps its own place (folder included): it's saved there and goes
+      // back there when the two are separated. {group, next}: its folder (or
+      // none) and the item that followed it.
+      const rowOrigin = new WeakMap();
+      const noteOrigin = tab => {
+        if (isRow(tab) && !tab.splitview && !rowOrigin.has(tab)) {
+          let next = tab.nextElementSibling;
+          while (next && !(next.localName === "tab" || isGroup(next) || isSplit(next))) {
+            next = next.nextElementSibling;
+          }
+          rowOrigin.set(tab, { group: tab.group ?? null, next });
+        }
+      };
+      const backToOrigin = tab => {
+        const { group, next } = rowOrigin.get(tab);
+        rowOrigin.delete(tab);
+        const level = group?.isConnected ? group : null;
+        if (next?.isConnected && next.parentElement === (level ?? gBrowser.tabContainer.arrowScrollbox)) {
+          gBrowser.moveTabBefore(tab, next);
+        } else if (level) {
+          level.addTabs([tab]);
+        } else {
+          if (tab.group) {
+            gBrowser.ungroupTab(tab);
+          }
+          moveToRowBlockEnd(tab);
+        }
+      };
       const unpinned = () => gBrowser.tabs.filter(t => !t.pinned && !t.hidden);
       const setRow = (tab, on) => {
         tab.toggleAttribute(ROW, on);
@@ -149,7 +186,7 @@ try {
       const listItems = () =>
         [...gBrowser.tabContainer.arrowScrollbox.children].filter(el => el.id !== "tabbrowser-arrowscrollbox-periphery");
       // The pinned block: rows and folders, always together at the top
-      const inBlock = el => isGroup(el) || (el?.localName === "tab" && isRow(el));
+      const inBlock = el => isGroup(el) || (el?.localName === "tab" && isRow(el)) || (isSplit(el) && hasRow(el));
       // Rows and folders always form one block at the top of the tab list
       const moveToRowBlockEnd = el => {
         const items = listItems().filter(item => item !== el && item !== el.group);
@@ -171,9 +208,26 @@ try {
         }
         normalizing = true;
         try {
+          // guests: marked while next to a row, sent back to the normal tabs
+          // once they're on their own again
+          for (const split of gBrowser.splitViews) {
+            for (const tab of split.tabs) {
+              tab.toggleAttribute(GUEST, !isRow(tab) && hasRow(split));
+            }
+          }
+          for (const tab of gBrowser.tabs.filter(t => rowOrigin.has(t) && !t.splitview)) {
+            backToOrigin(tab);
+          }
+          for (const tab of gBrowser.tabs.filter(t => t.hasAttribute(GUEST) && !t.splitview)) {
+            tab.removeAttribute(GUEST);
+            if (tab.group) {
+              gBrowser.ungroupTab(tab);
+            }
+            moveToRowBlockEnd(tab);
+          }
           for (const group of gBrowser.tabGroups) {
             for (const tab of group.tabs) {
-              if (!isRow(tab) && !leavingFolder.has(tab)) {
+              if (!isRow(tab) && !tab.splitview && !leavingFolder.has(tab)) {
                 setRow(tab, true);
               }
             }
@@ -194,6 +248,22 @@ try {
       const scheduleNormalize = () => {
         win.clearTimeout(normalizeTimer);
         normalizeTimer = win.setTimeout(normalize, 0);
+      };
+      // Two pages side by side become two tabs again: a row keeps its spot,
+      // a guest goes back down to the normal tabs
+      const separate = split => {
+        const guests = split.tabs.filter(t => !isRow(t));
+        split.unsplitTabs();
+        for (const tab of guests) {
+          if (tab.isConnected && !tab.closing) {
+            tab.removeAttribute(GUEST);
+            if (tab.group) {
+              gBrowser.ungroupTab(tab);
+            }
+            moveToRowBlockEnd(tab);
+          }
+        }
+        normalize();
       };
 
       // --- saving / restoring ---
@@ -440,15 +510,37 @@ try {
       };
       // [{id, url, title, icon}] for a tile or a row, {folder: {...}, tabs:
       // [...]} for a folder
-      const snapshot = () => ({
+      const snapshot = () => {
+        const away = gBrowser.tabs.filter(t => t.splitview && rowOrigin.has(t) && isRow(t));
+        const saved = savedSnapshot(t => !away.includes(t));
+        // rows in a split view away from their own place: saved there
+        for (const tab of away) {
+          const { group, next } = rowOrigin.get(tab);
+          const entry = { id: itemId(tab), ...tabEntry(tab) };
+          const matches = (e, el) => !!el && (el.localName === "tab"
+            ? e.id === el.getAttribute(ITEM_ID)
+            : isGroup(el)
+              ? e.folder?.id === folderId(el)
+              : isSplit(el) && el.tabs.some(t => t.getAttribute(ITEM_ID) === e.id));
+          const folder = group?.isConnected ? saved.block.find(e => e.folder?.id === folderId(group)) : null;
+          const list = folder ? folder.tabs : saved.block;
+          const at = list.findIndex(e => matches(e, next));
+          list.splice(at === -1 ? list.length : at, 0, entry);
+        }
+        return saved;
+      };
+      const savedSnapshot = keep => ({
         tiles: gBrowser.tabs.filter(t => t.pinned).map(t => ({ id: itemId(t), ...tabEntry(t) })),
-        block: listItems().filter(inBlock).map(item =>
+        // (a split view's rows are saved as rows; its guest isn't saved)
+        block: listItems().filter(inBlock).flatMap(item =>
           isGroup(item)
             ? {
                 folder: { id: folderId(item), label: item.label, color: item.color, collapsed: item.collapsed },
-                tabs: item.tabs.map(t => ({ id: itemId(t), ...tabEntry(t) })),
+                tabs: item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) })),
               }
-            : { id: itemId(item), ...tabEntry(item) }
+            : isSplit(item)
+              ? item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) }))
+              : { id: itemId(item), ...tabEntry(item) }
         ),
       });
       // The first browser window restores the list at launch; another one
@@ -495,6 +587,16 @@ try {
               gBrowser.unpinTab(tab);
             }
             tab.setAttribute(ROW, "");
+          }
+          // LibreWolf restores split views too: a row comes back on its own,
+          // its guest with the normal tabs (see normalize)
+          for (const split of [...gBrowser.splitViews]) {
+            if (hasRow(split)) {
+              for (const tab of split.tabs) {
+                tab.toggleAttribute(GUEST, !isRow(tab));
+              }
+              split.unsplitTabs();
+            }
           }
           for (const tab of marked) {
             moveToRowBlockEnd(tab.group ?? tab);
@@ -594,7 +696,7 @@ try {
       });
       gBrowser.tabContainer.addEventListener("TabPinned", scheduleSave);
       gBrowser.tabContainer.addEventListener("TabUnpinned", scheduleSave);
-      for (const type of ["TabGroupCreate", "TabGrouped", "TabUngrouped", "TabGroupRemoved"]) {
+      for (const type of ["TabGroupCreate", "TabGrouped", "TabUngrouped", "TabGroupRemoved", "SplitViewCreated", "SplitViewRemoved"]) {
         gBrowser.tabContainer.addEventListener(type, scheduleNormalize);
       }
       // A folder made from the menu moves into the block before LibreWolf
@@ -617,12 +719,26 @@ try {
       const toggleRow = () => {
         const makeRow = !isRow(gBrowser.selectedTab);
         for (const tab of [...gBrowser.selectedTabs]) {
+          const split = tab.splitview;
           if (makeRow) {
             if (tab.pinned) {
               gBrowser.unpinTab(tab);
             }
+            // a split view goes along, unless it's in the block already
+            const placed = split && inBlock(split.group ?? split);
             setRow(tab, true);
-            moveToRowBlockEnd(tab);
+            if (!placed) {
+              moveToRowBlockEnd(split ?? tab);
+            }
+          } else if (split) {
+            setRow(tab, false);
+            if (!hasRow(split)) {
+              if (split.group) {
+                gBrowser.ungroupSplitView(split);
+              }
+              moveToRowBlockEnd(split); // first place below the rows
+            }
+            scheduleNormalize();
           } else {
             gBrowser.ungroupTab(tab);
             setRow(tab, false);
@@ -638,6 +754,7 @@ try {
             gBrowser.pinTab(tab);
           } else {
             gBrowser.unpinTab(tab);
+            moveToRowBlockEnd(tab); // (LibreWolf puts it first, above the rows)
           }
         }
       };
@@ -867,7 +984,9 @@ try {
           leavingFolder.add(tab);
         }
         win.setTimeout(() => {
-          if (!tab.isConnected || tab.pinned || isRow(tab)) {
+          // (one opened into a split view, e.g. LibreWolf's "choose a tab"
+          // page or a restored split view, stays there)
+          if (!tab.isConnected || tab.pinned || isRow(tab) || tab.splitview) {
             return;
           }
           if (tab.group) {
@@ -1158,11 +1277,12 @@ try {
       }, true);
 
       // --- split view by drag and drop (as in Arc) ---
-      // Dragging a tab from the sidebar over the page shows two drop zones
-      // (#arc-split-drop, over the page: the page itself can't receive tab
-      // drags); dropping opens it beside the current page, on that side, with
-      // LibreWolf's own split view. Normal tabs only: LibreWolf keeps tiles
-      // out of split views, and a pinned row would leave the pinned block.
+      // Dragging a tab over the page shows two drop zones (#arc-split-drop,
+      // over the page: the page itself can't receive tab drags); dropping
+      // opens it beside the current page, on that side, with LibreWolf's own
+      // split view. Normal tabs and pinned rows (a split view with a row sits
+      // in the row's spot, see isSplit); not tiles: LibreWolf keeps its pinned
+      // tabs out of split views. A tab can come from another window too.
       const splitDrop = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
       splitDrop.id = "arc-split-drop";
       for (const side of ["left", "right"]) {
@@ -1177,16 +1297,34 @@ try {
       // the dragged tab selected, as without split view.
       let splitDragged = null;
       let splitPartner = null;
+      let splitForeign = false; // dragged from another window
       let beforePress = null;
-      const canSplit = tab => !!tab && !tab.pinned && !isRow(tab) && !tab.splitview && !tab.closing &&
+      const canSplit = tab => !!tab && !tab.pinned && !tab.splitview && !tab.closing &&
         !tab.hasAttribute("arc-start-page");
+      const showSplitDrop = (dragged, partner, foreign) => {
+        // over the page, but not over the sidebar floating above it
+        const page = doc.getElementById("tabbrowser-tabbox").getBoundingClientRect();
+        const sidebarBox = doc.querySelector("sidebar-main").getBoundingClientRect();
+        const left = Math.max(page.left, sidebarBox.width > 100 ? sidebarBox.right : 0);
+        Object.assign(splitDrop.style, {
+          left: `${left}px`,
+          top: `${page.top}px`,
+          width: `${page.right - left}px`,
+          height: `${page.height}px`,
+        });
+        splitDragged = dragged;
+        splitPartner = partner;
+        splitForeign = foreign;
+        splitDrop.setAttribute("active", "");
+      };
       const hideSplitDrop = () => {
         splitDrop.removeAttribute("active");
         splitDrop.removeAttribute("side");
-        if (splitDragged && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
+        if (splitDragged && !splitForeign && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
           gBrowser.selectedTab = splitDragged;
         }
         splitDragged = splitPartner = null;
+        splitForeign = false;
       };
       gBrowser.tabContainer.addEventListener("mousedown", e => {
         if (e.button === 0) {
@@ -1198,23 +1336,42 @@ try {
         const tab = target?.closest(".tabbrowser-tab");
         const partner = tab === gBrowser.selectedTab ? beforePress : gBrowser.selectedTab;
         beforePress = null;
-        if (!partner || partner === tab || !canSplit(tab) || !canSplit(partner)) {
+        if (partner && partner !== tab && canSplit(tab) && canSplit(partner)) {
+          showSplitDrop(tab, partner, false);
+        }
+      });
+      // A tab dragged in from another window: the zones show once the drag
+      // is over this window. A row there is a row here too (this window's own
+      // copy is used); a normal tab moves over.
+      const foreignDrag = e => {
+        const dt = e.dataTransfer;
+        if (splitDragged || dt?.mozTypesAt(0)?.[0] !== TAB_DROP_TYPE) {
           return;
         }
-        // over the page, but not over the sidebar floating above it
-        const page = doc.getElementById("tabbrowser-tabbox").getBoundingClientRect();
-        const sidebarBox = doc.querySelector("sidebar-main").getBoundingClientRect();
-        const left = Math.max(page.left, sidebarBox.width > 100 ? sidebarBox.right : 0);
-        Object.assign(splitDrop.style, {
-          left: `${left}px`,
-          top: `${page.top}px`,
-          width: `${page.right - left}px`,
-          height: `${page.height}px`,
-        });
-        splitDragged = tab;
-        splitPartner = partner;
-        splitDrop.setAttribute("active", "");
-      });
+        let tab = null;
+        try {
+          tab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+        } catch {}
+        if (!tab || gBrowser.tabs.includes(tab) || !canSplit(tab) || !canSplit(gBrowser.selectedTab)) {
+          return;
+        }
+        if (isRow(tab)) {
+          const own = findItem(tab.getAttribute(ITEM_ID));
+          if (!own || own === gBrowser.selectedTab || !canSplit(own)) {
+            return;
+          }
+        }
+        showSplitDrop(tab, gBrowser.selectedTab, true);
+      };
+      win.addEventListener("dragenter", foreignDrag, true);
+      win.addEventListener("dragover", foreignDrag, true);
+      win.addEventListener("dragleave", e => {
+        // (the drag left the window; dragend only reaches the window it
+        // started in)
+        if (splitForeign && !e.relatedTarget) {
+          hideSplitDrop();
+        }
+      }, true);
       splitDrop.addEventListener("dragover", e => {
         if (!splitDragged) {
           return;
@@ -1235,8 +1392,9 @@ try {
         }
       });
       splitDrop.addEventListener("drop", e => {
-        const dragged = splitDragged;
+        let dragged = splitDragged;
         const partner = splitPartner;
+        const foreign = splitForeign;
         if (!dragged) {
           return;
         }
@@ -1245,16 +1403,56 @@ try {
         const onLeft = splitDrop.getAttribute("side") === "left";
         splitDragged = splitPartner = null;
         hideSplitDrop();
-        if (canSplit(dragged) && canSplit(partner)) {
-          try {
+        try {
+          if (foreign) {
+            dragged = isRow(dragged)
+              ? findItem(dragged.getAttribute(ITEM_ID))
+              : gBrowser.adoptTab(dragged, { tabIndex: gBrowser.tabs.length, selectTab: false });
+          }
+          if (canSplit(dragged) && canSplit(partner) && dragged !== partner) {
             gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
             gBrowser.selectedTab = dragged;
-          } catch (err) {
-            console.error("Arc sidebar (split view):", err);
           }
+        } catch (err) {
+          console.error("Arc sidebar (split view):", err);
         }
       });
       win.addEventListener("dragend", hideSplitDrop, true);
+      win.addEventListener("drop", () => win.setTimeout(() => splitForeign && hideSplitDrop(), 0), true);
+      // However a split view is made (drop, right-click menu, LibreWolf's
+      // "choose a tab" page): one with a row goes in the row's spot, and a
+      // tile is left out (LibreWolf would make a split view of one page)
+      let splitAnchor = null; // the row whose spot a new split view takes
+      const addTabSplitView = gBrowser.addTabSplitView.bind(gBrowser);
+      gBrowser.addTabSplitView = (tabs, options = {}) => {
+        const usable = (tabs || []).filter(t => !t.pinned);
+        if (tabs?.length >= 2 && usable.length < 2) {
+          return null;
+        }
+        const row = usable.filter(isRow).sort((a, b) => gBrowser.tabs.indexOf(a) - gBrowser.tabs.indexOf(b))[0];
+        splitAnchor = row ?? null;
+        try {
+          return addTabSplitView(usable, row ? { ...options, insertBefore: row } : options);
+        } finally {
+          splitAnchor = null;
+        }
+      };
+      // (LibreWolf adds the tabs one by one through this, and its "choose a
+      // tab" page through it too)
+      const moveTabToSplitView = gBrowser.moveTabToSplitView.bind(gBrowser);
+      gBrowser.moveTabToSplitView = (tab, split, ...rest) => {
+        if (tab && split && isRow(tab) && !tab.splitview) {
+          if (splitAnchor ? tab !== splitAnchor : hasRow(split)) {
+            noteOrigin(tab);
+          } else if (!splitAnchor && !split.group) {
+            // a split view of normal tabs that a row joins goes to its spot
+            try {
+              gBrowser.moveTabBefore(split, tab);
+            } catch {}
+          }
+        }
+        return moveTabToSplitView(tab, split, ...rest);
+      };
 
       // --- closing a pinned row or tile resets it instead ---
       // It goes back to its pinned page, unloaded (except when its whole
@@ -1326,8 +1524,28 @@ try {
             !gBrowser.tabs.some(t => t !== tab && !t.closing && !t.hidden && !isPinnedish(t) && !t.hasAttribute("arc-start-page"))) {
           gBrowser.selectedTab = nextAfterClose(tab);
         }
+        // closing one half of a split view shows the other one
+        const otherHalf = tab?.selected && tab.splitview?.tabs.find(t => t !== tab && !t.closing);
         if (!tab || !isPinnedish(tab) || closingFolderTabs.has(tab)) {
+          if (otherHalf && !otherHalf.pinned) {
+            gBrowser.selectedTab = otherHalf;
+          }
           return removeTab(tab, options);
+        }
+        // A row in a split view leaves it first (the other page stays open,
+        // full width) and is reset in its own spot
+        if (tab.splitview) {
+          const others = tab.splitview.tabs.filter(t => t !== tab);
+          const selected = tab.selected;
+          separate(tab.splitview);
+          const next = others.find(t => t.isConnected && !t.closing);
+          if (selected) {
+            whenSwitched(() => resetClosed(tab));
+            gBrowser.selectedTab = next || nextAfterClose(tab);
+          } else {
+            resetClosed(tab);
+          }
+          return undefined;
         }
         if (tab.selected) {
           whenSwitched(() => resetClosed(tab));
@@ -1459,8 +1677,10 @@ try {
               gBrowser.moveTabBefore(tab, pinned[i]);
             }
           });
-          // rows and folders, in order
-          shared.block.forEach((item, i) => {
+          // rows and folders, in order (a split view with rows in it counts
+          // once, in its first row's place)
+          let next = 0;
+          shared.block.forEach(item => {
             let el;
             if (item.folder) {
               let group = gBrowser.tabGroups.find(g => folderId(g) === item.folder.id);
@@ -1482,23 +1702,31 @@ try {
                   if (tab.group !== group) {
                     group.addTabs([tab]);
                   }
-                  if (group.tabs[j] && group.tabs[j] !== tab) {
-                    gBrowser.moveTabBefore(tab, group.tabs[j]);
+                  // (rows in a split view stay in it)
+                  const rowsNow = group.tabs.filter(isRow);
+                  if (!tab.splitview && rowsNow[j] && rowsNow[j] !== tab && !rowsNow[j].splitview) {
+                    gBrowser.moveTabBefore(tab, rowsNow[j]);
                   }
                 });
               }
               el = group;
             } else {
               el = asRow(item, null);
+              el = el.splitview && !el.splitview.group ? el.splitview : el;
             }
             const block = listItems().filter(inBlock);
-            if (block[i] !== el) {
-              if (block[i]) {
-                gBrowser.moveTabBefore(el, block[i]);
+            const at = block.indexOf(el);
+            if (at !== -1 && at < next) {
+              return; // (a split view's second row)
+            }
+            if (block[next] !== el) {
+              if (block[next]) {
+                gBrowser.moveTabBefore(el, block[next]);
               } else {
                 moveToRowBlockEnd(el);
               }
             }
+            next++;
           });
         } catch (e) {
           console.error("Arc sidebar (sync):", e);
