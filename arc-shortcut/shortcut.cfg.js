@@ -985,11 +985,11 @@ try {
       doc.getElementById("key_inspectorMac")?.setAttribute("disabled", "true");
 
       // Cmd+1…9 go to the tiles in order, then on to the pinned rows (a
-      // collapsed folder's rows don't count). LibreWolf's own (the 1st to 8th
+      // collapsed folder's hidden rows don't count). LibreWolf's own (the 1st to 8th
       // tab, the last tab) counted every tab, rows and folders in between.
       const pinnedInOrder = () => [
         ...gBrowser.tabs.filter(t => t.pinned),
-        ...gBrowser.tabs.filter(t => !t.pinned && isRow(t) && !t.group?.collapsed),
+        ...gBrowser.tabs.filter(t => !t.pinned && isRow(t) && (!t.group?.collapsed || t.visible)),
       ];
       for (const id of ["key_selectTab1", "key_selectTab2", "key_selectTab3", "key_selectTab4", "key_selectTab5",
                         "key_selectTab6", "key_selectTab7", "key_selectTab8", "key_selectLastTab"]) {
@@ -1016,6 +1016,71 @@ try {
           }
         }
       }, true);
+
+      // --- folders opening and closing ---
+      // A collapsed folder keeps showing its loaded tabs (unloaded ones hide;
+      // LibreWolf showed only the selected one and a "+N" for the rest), and
+      // its rows slide open and shut (as in the Finder's sidebar). The
+      // folder icon's front tilts open with it (userChrome.css).
+      const folderClass = win.customElements.get("tab-group");
+      if (folderClass && !folderClass.prototype._arcFolding) {
+        const proto = folderClass.prototype;
+        proto._arcFolding = true;
+        const isLoaded = tab => !tab.hasAttribute("pending");
+        // (what LibreWolf's own code counts as shown: keyboard moves, drags)
+        const isTabVisibleInGroup = proto.isTabVisibleInGroup;
+        proto.isTabVisibleInGroup = function (tab) {
+          return isTabVisibleInGroup.call(this, tab) ||
+            (this.collapsed && !this.isBeingDragged && !tab.splitview && isLoaded(tab));
+        };
+        const collapsedProp = Object.getOwnPropertyDescriptor(proto, "collapsed");
+        Object.defineProperty(proto, "collapsed", {
+          ...collapsedProp,
+          set(val) {
+            const group = this;
+            const rows = () => [...group.querySelectorAll(":scope > .tabbrowser-tab, :scope > tab-split-view-wrapper")];
+            // (shown rows and their heights)
+            const shown = () => new Map(rows().map(el => [el, el.getBoundingClientRect().height]).filter(([, h]) => h > 0));
+            const w = group.ownerDocument.defaultView;
+            const animate = !!val !== group.collapsed && group.isConnected &&
+              !w.document.documentElement.hasAttribute("arc-starting") &&
+              !w.gBrowser.tabContainer.hasAttribute("movingtab") && !group.isBeingDragged &&
+              !w.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const before = animate ? shown() : null;
+            collapsedProp.set.call(group, val);
+            if (!animate) {
+              return;
+            }
+            const after = shown();
+            const changed = val ? [...before].filter(([el]) => !after.has(el)) : [...after].filter(([el]) => !before.has(el));
+            for (const [el, height] of changed) {
+              for (const a of el.getAnimations()) {
+                if (a.id === "arc-fold") {
+                  a.cancel();
+                }
+              }
+              // ([arc-folding] moves the row's gaps inside it, so the whole
+              // height can shrink: userChrome.css)
+              const open = { height: `${height}px`, opacity: 1 };
+              const shut = { height: "0px", opacity: 0 };
+              el.setAttribute("arc-folding", "");
+              const anim = el.animate(val ? [open, shut] : [shut, open], {
+                id: "arc-fold",
+                duration: val ? 220 : 280,
+                easing: "cubic-bezier(0.32, 0.72, 0, 1)",
+              });
+              anim.finished.then(() => el.removeAttribute("arc-folding"), () => {});
+            }
+          },
+        });
+        // a tab in a collapsed folder loading or unloading shows or hides it:
+        // LibreWolf's list of shown tabs must hear about it
+        new win.MutationObserver(records => {
+          if (records.some(r => r.target.group?.collapsed)) {
+            gBrowser.tabContainer._invalidateCachedVisibleTabs?.();
+          }
+        }).observe(gBrowser.tabContainer, { attributes: true, attributeFilter: ["pending"], subtree: true });
+      }
 
       // --- the auto-hide sidebar's color ---
       // The pinned sidebar shows macOS's window background (from the theme,
@@ -1319,7 +1384,7 @@ try {
         const marks = startMids.filter(m => !moving.includes(m.tab)).sort((a, b) => a.mid - b.mid);
         const after = marks.find(m => m.mid >= y)?.tab;
         const before = marks.filter(m => m.mid < y).at(-1)?.tab;
-        if (after?.localName === "tab" && after.group && !after.group.collapsed && before && groupOf(before) === after.group) {
+        if (after?.localName === "tab" && after.group && (!after.group.collapsed || after.visible) && before && groupOf(before) === after.group) {
           gBrowser.moveTabBefore(tab, after);
           return;
         }

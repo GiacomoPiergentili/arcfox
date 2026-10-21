@@ -57,3 +57,4 @@ Nothing queued.
 - [x] Sidebar notice when the script isn't running (e.g. after a LibreWolf update).
 - [x] Cmd+Shift+C copies the page address, with a "Link Copied" confirmation.
 - [x] Cmd+1…9 go to the tiles in order, then the pinned rows.
+- [x] Folders: a collapsed folder keeps showing its loaded tabs (no "+N"); rows slide open and shut; the folder icon's front tilts open and shuts.

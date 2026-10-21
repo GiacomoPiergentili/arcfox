@@ -394,6 +394,37 @@ box.hidden = true;
 return result({});
 """),
 
+    ("folders: collapsed keeps loaded tabs, rows slide, icon opens", r"""
+const g = gBrowser.tabGroups[0];
+g.collapsed = false; await wait(400);
+gBrowser.selectedTab = gBrowser.tabs.find(t => t.label === "Normal 2"); await wait(300);
+for (const t of g.tabs) if (t.hasAttribute("pending")) { gBrowser.selectedTab = t; await wait(600); }
+gBrowser.selectedTab = gBrowser.tabs.find(t => t.label === "Normal 2"); await wait(300);
+const folderIcon = g.querySelector(".tab-group-label");
+const openIcon = getComputedStyle(folderIcon, "::after").transform;
+const last = g.tabs.at(-1);
+gBrowser.discardBrowser(last); await wait(300);
+check(last.hasAttribute("pending"), "the last row is unloaded");
+const h0 = R(last).h;
+g.collapsed = true;
+const frames = [];
+for (let i = 0; i < 20; i++) { await new Promise(k => requestAnimationFrame(k)); frames.push(Math.round(R(last).h)); }
+check(frames.some(h => h > 2 && h < h0 - 2), "the unloaded row slides shut: " + frames.join(","));
+check(frames.at(-1) === 0, "...all the way");
+await wait(300);
+check(g.tabs.slice(0, -1).every(t => R(t).h > 0 && t.visible), "the loaded rows stay shown (and count as shown)");
+check(!last.visible, "the unloaded one is hidden");
+check(getComputedStyle(g.querySelector(".tab-group-overflow-count-container")).display === "none", "no +N bubble");
+check(getComputedStyle(folderIcon, "::after").transform !== openIcon, "the folder icon shuts");
+g.collapsed = false;
+const opening = [];
+for (let i = 0; i < 24; i++) { await new Promise(k => requestAnimationFrame(k)); opening.push(Math.round(R(last).h)); }
+check(opening.some(h => h > 2 && h < h0 - 2) && near(opening.at(-1), h0, 0.6), "it slides open again: " + opening.join(","));
+await wait(300);
+check(!last.hasAttribute("arc-folding") && getComputedStyle(folderIcon, "::after").transform === openIcon, "back to normal, icon open");
+return result({});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);
