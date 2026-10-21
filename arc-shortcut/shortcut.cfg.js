@@ -1163,6 +1163,15 @@ try {
         });
       };
       const placeAt = (tab, y, moving) => {
+        // between two items of an open folder: into the folder, there
+        const groupOf = el => el.localName === "tab" ? el.group : el.closest("tab-group");
+        const marks = startMids.filter(m => !moving.includes(m.tab)).sort((a, b) => a.mid - b.mid);
+        const after = marks.find(m => m.mid >= y)?.tab;
+        const before = marks.filter(m => m.mid < y).at(-1)?.tab;
+        if (after?.localName === "tab" && after.group && !after.group.collapsed && before && groupOf(before) === after.group) {
+          gBrowser.moveTabBefore(tab, after);
+          return;
+        }
         // before the first top-level item (tab or folder) that started below y
         const below = new Set(startMids.filter(m => m.mid >= y).map(m => itemOf(m.tab)));
         const others = listItems().filter(item => !moving.includes(item));
@@ -1189,11 +1198,16 @@ try {
         }
       });
       gBrowser.tabContainer.addEventListener("TabUnpinned", e => {
-        if (pendingDrop?.wasTile.includes(e.target)) {
-          placeAt(e.target, pendingDrop.y, pendingDrop.moving);
-          if (pendingDrop.toRow) {
-            setRow(e.target, true);
+        const drop = pendingDrop;
+        if (drop?.wasTile.includes(e.target)) {
+          const tab = e.target;
+          placeAt(tab, drop.y, drop.moving);
+          if (drop.toRow) {
+            setRow(tab, true);
           }
+          // again once LibreWolf is done with the drop: it moves the tab
+          // itself after unpinning it (into a folder only we know about)
+          Promise.resolve().then(() => tab.isConnected && !tab.pinned && placeAt(tab, drop.y, drop.moving));
         }
       });
       const finishDrop = ({ moving, y, limit }) => {
@@ -1427,8 +1441,24 @@ try {
           !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && shouldActivate();
       }
       gBrowser.tabContainer.addEventListener("drop", endDrag, true);
+      // Leaving the sidebar doesn't end the drag (it may come back, e.g.
+      // after a detour over the page): only the cues that follow the pointer
+      // go; LibreWolf keeps everything else as it was until the drop
       gBrowser.tabContainer.addEventListener("dragleave", e => {
         if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
+          closeTileGap();
+          for (const name of ["arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-snap-row"]) {
+            dragRoot.removeAttribute(name);
+          }
+          for (const el of gBrowser.tabContainer.querySelectorAll("[arc-make-room]")) {
+            el.removeAttribute("arc-make-room");
+          }
+        }
+      }, true);
+      // A drag that ended without reaching us (dropped outside the window,
+      // cancelled): the next click proves it's over, as LibreWolf assumes too
+      win.addEventListener("mousedown", e => {
+        if (e.button === 0 && dragRoot.hasAttribute("arc-dragging")) {
           endDrag();
         }
       }, true);
@@ -1472,10 +1502,13 @@ try {
         splitDragged = dragged;
         splitPartner = partner;
         splitForeign = foreign;
-        splitDrop.setAttribute("active", "");
+        if (dragged) {
+          splitDrop.setAttribute("active", "");
+        }
       };
       const hideSplitDrop = () => {
         splitDrop.removeAttribute("active");
+        splitDrop.removeAttribute("catch");
         splitDrop.removeAttribute("side");
         if (splitDragged && !splitForeign && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
           gBrowser.selectedTab = splitDragged;
@@ -1495,6 +1528,13 @@ try {
         beforePress = null;
         if (partner && partner !== tab && canSplit(tab) && canSplit(partner)) {
           showSplitDrop(tab, partner, false);
+        } else {
+          // No split possible (or a folder, a split pair): the page still takes the drop and does nothing
+          // with it (LibreWolf would tear the tab off into a new window when
+          // it's dropped anywhere past the sidebar; as in Arc and Safari, only
+          // a drop outside the window does)
+          showSplitDrop(null, null, false);
+          splitDrop.setAttribute("catch", "");
         }
       });
       // A tab dragged in from another window: the zones show once the drag
@@ -1502,7 +1542,7 @@ try {
       // copy is used); a normal tab moves over.
       const foreignDrag = e => {
         const dt = e.dataTransfer;
-        if (splitDragged || dt?.mozTypesAt(0)?.[0] !== TAB_DROP_TYPE) {
+        if (splitDragged || splitDrop.hasAttribute("catch") || dt?.mozTypesAt(0)?.[0] !== TAB_DROP_TYPE) {
           return;
         }
         let tab = null;
@@ -1531,6 +1571,12 @@ try {
       }, true);
       splitDrop.addEventListener("dragover", e => {
         if (!splitDragged) {
+          if (splitDrop.hasAttribute("catch")) {
+            e.preventDefault();
+            if (e.dataTransfer) {
+              e.dataTransfer.dropEffect = "move";
+            }
+          }
           return;
         }
         e.preventDefault();
@@ -1553,6 +1599,11 @@ try {
         const partner = splitPartner;
         const foreign = splitForeign;
         if (!dragged) {
+          if (splitDrop.hasAttribute("catch")) {
+            e.preventDefault();
+            e.stopPropagation();
+            hideSplitDrop();
+          }
           return;
         }
         e.preventDefault();
