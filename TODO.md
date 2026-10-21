@@ -4,7 +4,6 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Auto-archive**: close normal tabs untouched for a set time (12h / a day / a week / off); never rows or tiles.
 - [ ] **Light mode pass**: everything was verified in dark mode (Nova Ash theme); light-mode colors are set but untested.
 
 ## Later
@@ -26,6 +25,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Done
 
+- [x] Auto-archive: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`, 0 = off).
 - [x] Sidebar notice when the script isn't running (e.g. after a LibreWolf update).
 - [x] Cmd+Shift+C copies the page address, with a "Link Copied" confirmation.
 - [x] Cmd+1…9 go to the tiles in order, then the pinned rows.

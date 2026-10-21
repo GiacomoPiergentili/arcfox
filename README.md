@@ -38,6 +38,11 @@ Built and tested on **LibreWolf 158** (macOS, dark mode).
 - Closing a row or tile resets it (back to its pinned page, unloaded) instead of closing it.
 - After closing a row, a tile or the last normal tab you go to the most recently used open row, else the empty page with the bar, never to an unloaded row that would start loading.
 
+### Auto-archive (as in Arc)
+- Normal tabs left unused for 24 hours close by themselves, quietly. They're in LibreWolf's recently closed tabs (Cmd+Shift+T, or History → Recently Closed Tabs), form contents included.
+- Never touched: tiles, pinned rows and folders, the current tab, and tabs playing sound, in picture-in-picture, sharing the camera/mic/screen or still loading.
+- Change the time in `about:config` → `arc.archiveAfterHours` (hours; `0` turns it off).
+
 ### Polish
 - macOS sidebar typography (13px) on 32px rows with 4px gaps; 40px tiles 8px apart; every icon and title on shared columns.
 - Menus as macOS menus; dialog-like panels (Translate, Edit Bookmark) as macOS popovers.
@@ -84,7 +89,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `librewolf.cfg` and the pref file below. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Disables the autoconfig sandbox so the script can reach browser windows. |
 
-The script keeps its state in prefs and session data: pinned rows and folders in the pref `arc.pinnedRows`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
+The script keeps its state in prefs and session data: pinned rows and folders in the pref `arc.pinnedRows`, the auto-archive time in `arc.archiveAfterHours`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
 
 Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
 
@@ -102,5 +107,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 8. **Full audit**: dead code and stale comments removed, dialog panels restyled as popovers, and bugs fixed: folders lost at every launch, a 2px drag offset, a black tile after Cmd+W (a stale "visually selected" state), tiles turning into rows in auto-hide mode.
 
 9. **Update safety and shortcuts**: a sidebar notice when the script isn't running (after a LibreWolf update); Cmd+Shift+C copies the page address with a "Link Copied" confirmation; Cmd+1…9 go to the tiles, then the pinned rows.
+
+10. **Auto-archive**: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`).
 
 Plans and known gaps: see [TODO.md](TODO.md).

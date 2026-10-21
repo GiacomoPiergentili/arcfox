@@ -12,6 +12,7 @@
 // Pinned rows and tiles remember their pinned page (dot while away).
 // Selected tiles take their icon's colors (as in Zen).
 // Cmd+Shift+C copies the page's address; Cmd+1…9 go to the tiles, then the rows.
+// Normal tabs unused for a day close by themselves (arc.archiveAfterHours).
 try {
   (() => {
     const Cc = Components.classes;
@@ -22,10 +23,13 @@ try {
     // Dragging a tab onto another one reorders it (as in Arc) instead of
     // pausing to create a tab group. Set here: LibreWolf's own defaults load
     // after the app's defaults/pref files and would override it there.
-    Cc["@mozilla.org/preferences-service;1"]
+    const defaults = Cc["@mozilla.org/preferences-service;1"]
       .getService(Ci.nsIPrefService)
-      .getDefaultBranch("")
-      .setBoolPref("browser.tabs.dragDrop.createGroup.enabled", false);
+      .getDefaultBranch("");
+    defaults.setBoolPref("browser.tabs.dragDrop.createGroup.enabled", false);
+    // Auto-archive (see below): hours a normal tab may stay unused; 0 = off
+    const ARCHIVE_PREF = "arc.archiveAfterHours";
+    defaults.setIntPref(ARCHIVE_PREF, 24);
 
     function toggleSidebarMode() {
       const current = prefs.getStringPref(PREF, "always-show");
@@ -653,6 +657,31 @@ try {
           }
         }
       }, true);
+
+      // --- auto-archive (as in Arc) ---
+      // Normal tabs left unused for arc.archiveAfterHours (24 by default, 0 =
+      // off) close by themselves, quietly; they're in LibreWolf's recently
+      // closed tabs (Cmd+Shift+T). Never: tiles, pinned rows and folders, the
+      // current tab, the empty page, or tabs playing sound, in
+      // picture-in-picture, sharing the camera / mic / screen or loading.
+      const archiveOldTabs = () => {
+        const hours = prefs.getIntPref(ARCHIVE_PREF, 24);
+        if (!(hours > 0)) {
+          return;
+        }
+        const cutoff = Date.now() - hours * 3600 * 1000;
+        const old = gBrowser.tabs.filter(tab =>
+          !tab.pinned && !isRow(tab) && !tab.group && !tab.selected && !tab.multiselected && !tab.closing &&
+          !tab.hasAttribute("arc-start-page") &&
+          !["soundplaying", "pictureinpicture", "sharing", "busy"].some(a => tab.hasAttribute(a)) &&
+          tab.lastAccessed < cutoff);
+        for (const tab of old) {
+          gBrowser.removeTab(tab, { animate: false, skipPermitUnload: true });
+        }
+      };
+      // shortly after launch (once the session is back), then every 10 minutes
+      SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(archiveOldTabs, 30 * 1000));
+      win.setInterval(archiveOldTabs, 10 * 60 * 1000);
 
       // --- keeping the row block intact ---
       // A tile is never a row. A tab opened inside the block (a link from a
