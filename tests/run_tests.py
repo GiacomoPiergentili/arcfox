@@ -372,10 +372,12 @@ check(dl.x - sb.x < 20 && sb.r - ext.r < 20, "Downloads at the left end, Extensi
 check(b[0].x > dl.r && b.at(-1).r < ext.x, "between them, clear of both");
 const tools = [...(document.querySelector("sidebar-main").shadowRoot?.querySelectorAll(".tools-and-extensions moz-button") || [])];
 check(tools.every(t => getComputedStyle(t).visibility === "hidden"), "LibreWolf's tool buttons (Bookmarks, History) aren't shown: " + tools.length);
-const avatar = box.firstElementChild;
+const avatar = box.querySelector(".arc-profile:not([current])");
 InspectorUtils.addPseudoClassLock(avatar, ":hover"); await wait(300);
 const hov = getComputedStyle(avatar);
-check(hov.opacity === "1" && hov.backgroundColor !== "rgba(0, 0, 0, 0)", "a hovered avatar lights up on a round fill: " + hov.backgroundColor);
+check(hov.backgroundColor !== "rgba(0, 0, 0, 0)" && hov.borderRadius === getComputedStyle(document.querySelector("#downloads-button .toolbarbutton-badge-stack")).borderRadius, "a hovered profile gets Downloads' rounded-square fill: " + hov.backgroundColor + " " + hov.borderRadius);
+const cur = box.querySelector("[current]"), other = box.querySelector(".arc-profile:not([current])");
+check(getComputedStyle(cur).boxShadow === "none" && getComputedStyle(cur.firstChild).filter === "none" && getComputedStyle(other.firstChild).filter.includes("grayscale"), "no ring on the current profile; the others greyed out");
 InspectorUtils.clearPseudoClassLocks(avatar);
 const wide = box.children.length;
 document.getElementById("sidebar-container").style.width = "300px"; await wait(400);

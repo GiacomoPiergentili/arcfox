@@ -29,7 +29,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 
 ### Profiles (Arc's Spaces)
 - LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
-- **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one ringed; hovering one lights it up on a soft round fill, with its name), as many as fit. Click one to bring its window forward (or start it). Shown once there are two profiles.
+- **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one in its colors, the others greyed out; hover for the name, with the same rounded-square fill as the other icon buttons), as many as fit. Click one to bring its window forward (or start it). Shown once there are two profiles.
 - New profiles are made from LibreWolf's Profiles menu. On a profile's first run, if it doesn't have the look yet, its `chrome` folder is linked to this repo (`install.sh` records where it is) and the settings that load it are turned on; a bar offers to restart, since the look loads at startup.
 - Any profile's first run with the script gives it, once, the settings the layout relies on (no bookmarks toolbar, a blank start page, no new tab page content); what you change afterwards stays.
 

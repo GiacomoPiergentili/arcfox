@@ -1788,8 +1788,7 @@ split-view-footer {
 /* ---------- Profile switcher ----------
    In the middle of the sidebar's bottom row, between Downloads and
    Extensions (#arc-profiles, from the shortcut script): the profiles'
-   avatars in their own colors, the current one ringed. Hovering one lights
-   it up on a soft round fill; pressing it gives a little. */
+   avatars, the current one in its colors, the others greyed out. */
 #arc-profiles {
   position: absolute !important;
   top: calc(100vh - 36.5px - var(--fullscreen-menubar-shift, 0px));
@@ -1805,45 +1804,41 @@ split-view-footer {
     display: none;
   }
 
+  /* Each avatar sits on a 30px button like every other icon button: the
+     same rounded-square hover and pressed fills. The other profiles are
+     greyed out; the current one is in its colors. */
   > .arc-profile {
     appearance: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 30px;
+    height: 30px;
     margin: 0;
     padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: var(--arc-radius-inner);
     background: transparent;
     color: inherit;
-    opacity: 0.55;
-    transition: opacity var(--arc-hover-duration) ease-out, background-color var(--arc-hover-duration) ease-out, box-shadow var(--arc-hover-duration) ease-out, scale 120ms ease-out;
+    transition: background-color var(--arc-hover-duration) ease-out;
 
-    /* (the fill shows as a ring round the avatar, reaching halfway into
-       the gap to the next one) */
-    &:hover {
-      opacity: 1;
-      background-color: var(--arc-fill-hover);
-      box-shadow: 0 0 0 2px var(--arc-fill-hover);
+    &:not([current]) > img {
+      filter: grayscale(1);
+      opacity: 0.5;
     }
 
-    &:hover:active {
-      scale: 0.9;
-      background-color: var(--arc-fill-selected);
-      box-shadow: 0 0 0 2px var(--arc-fill-selected);
+    /* (the toolbar buttons' own fills, so they match Downloads exactly) */
+    &:not([current]):hover {
+      background-color: var(--toolbarbutton-background-color-hover);
+    }
+
+    &:not([current]):hover:active {
+      background-color: var(--toolbarbutton-background-color-active);
     }
 
     &:focus-visible {
       outline: 2px solid var(--arc-focus-ring);
-      outline-offset: 1px;
-      opacity: 1;
-    }
-
-    &[current] {
-      opacity: 1;
-      box-shadow: 0 0 0 2px light-dark(var(--arc-sidebar-light, Canvas), var(--arc-sidebar-dark, Canvas)), 0 0 0 3.5px var(--arc-focus-ring);
+      outline-offset: -2px;
     }
 
     > img {

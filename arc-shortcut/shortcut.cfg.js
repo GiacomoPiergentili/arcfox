@@ -2231,12 +2231,13 @@ try {
         ({ SelectableProfileService: profileService } = win.ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
       } catch {}
       // As many as fit between Downloads and Extensions (centered, 4px clear
-      // of them; 24px avatars 4px apart): fewer in a narrow sidebar
+      // of them; 30px buttons 4px apart, like the other icon buttons): fewer
+      // in a narrow sidebar
       const maxProfiles = () => {
         const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
         // Downloads ends 43px in, Extensions starts 42px from the end
         const room = width - 2 * 47;
-        return Math.max(1, Math.floor((room + 4) / 28));
+        return Math.max(1, Math.floor((room + 4) / 34));
       };
       let lastProfiles = null;
       // (list, current): also called by the tests with made-up profiles
