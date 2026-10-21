@@ -361,8 +361,8 @@ sidebar-main {
 
 /* A collapsed folder keeps showing its loaded tabs (LibreWolf showed only
    the selected one, and a "+N" for the others): only unloaded ones hide.
-   The script slides rows open and shut ([arc-folding] keeps a closing row
-   on screen until it has slid shut). */
+   The script slides rows open and shut, here and when tabs open and close
+   ([arc-folding] keeps a closing row on screen until it has slid shut). */
 #tabbrowser-tabs[orient="vertical"] tab-group[collapsed]:not([movingtabgroup]) > .tabbrowser-tab:is(:not([pending]), [arc-folding]),
 #tabbrowser-tabs[orient="vertical"] tab-group[collapsed]:not([movingtabgroup]) > tab-split-view-wrapper[arc-folding] {
   display: flex !important;
@@ -372,7 +372,7 @@ sidebar-main {
   display: none !important;
 }
 
-#tabbrowser-tabs[orient="vertical"] tab-group > [arc-folding] {
+#tabbrowser-tabs[orient="vertical"] :is(tab-group > [arc-folding], .tabbrowser-tab[arc-folding]) {
   overflow: clip !important;
   min-height: 0 !important;
   box-sizing: border-box !important;

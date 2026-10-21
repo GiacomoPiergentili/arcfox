@@ -37,6 +37,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
 - **Pinned rows** (Cmd+D): normal tabs kept above the divider; saved and reopened (unloaded) at every launch.
 - **Folders**: LibreWolf's tab groups, kept in the pinned block, styled like Arc's. A collapsed folder keeps showing its loaded tabs (only unloaded ones hide; no "+N"). Opening or closing one slides its rows open or shut, and the folder icon's front tilts open or shuts with it.
+- **Motion**: a tab's row slides open when it opens and shut when it closes (the rows below follow); Cmd+D, Cmd+Shift+D and Pin / Unpin glide everything to its new place, a tab turning into a tile (or back) growing into it; closing a pinned row or tile settles it back in place, so it reads as put back. Off with the system's Reduce Motion.
 - Arc-style drag and drop between tiles, rows, folders and normal tabs, with live cues: a tab dropped on the tiles becomes a tile right where it's dropped (the tiles slide aside to make room, the grid grows a line if needed); a folder folds up while it's dragged without the list below jumping; whatever moves when a drop lands glides there. No tab preview cards during drags. A tab dropped on the page goes back where it was (or splits, see below) instead of tearing off into a new window; only a drop outside the window does that, as in Arc and Safari. Drags may wander anywhere (over the page, in and out of the sidebar) and come back.
 - **Every window shows the same tiles, rows and folders**, kept in sync: pin, reorder, rename or remove in one window and the others follow (each window has its own copy of the pages, unloaded until opened). Private windows keep to themselves.
 - **Pinned page**: each row and tile remembers the page it was pinned on. A dot shows when it's somewhere else; clicking the dot (or Cmd+W, or the right-click menu) goes back. One-time bot-check addresses (Reddit, Cloudflare) are ignored.
@@ -129,7 +130,7 @@ Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`:
 python3 tests/run_tests.py
 ```
 
-Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, folders opening and closing, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
+Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, folders opening and closing, tabs sliding and gliding, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
 
 ## What's been done
 
@@ -161,6 +162,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 21. **Start-up**: recorded at 60 fps: a stray "New Tab" row, blank tiles and icons arriving one by one for about a second. Tiles now come back unloaded (loading three heavy sites at launch was most of the wait), and the tab list stays hidden until it's complete, then fades in.
 22. **Profile switcher**: LibreWolf profiles as Arc's Spaces, switched from the bottom of the sidebar; new profiles get this look on their first run.
 23. **Folders open and close**: a collapsed folder keeps its loaded tabs in view instead of a "+N"; rows slide open and shut, and the folder icon opens and shuts with them.
+24. **Motion**: tabs slide open and shut; pinning and unpinning glide everything to its new place; closing a pinned row or tile settles it back in place.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

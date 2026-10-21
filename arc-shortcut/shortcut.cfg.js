@@ -685,20 +685,25 @@ try {
         }
         return saved;
       };
-      const savedSnapshot = keep => ({
-        tiles: gBrowser.tabs.filter(t => t.pinned).map(t => ({ id: itemId(t), ...tabEntry(t) })),
-        // (a split view's rows are saved as rows; its guest isn't saved)
-        block: listItems().filter(inBlock).flatMap(item =>
-          isGroup(item)
-            ? {
-                folder: { id: folderId(item), label: item.label, color: item.color, collapsed: item.collapsed },
-                tabs: item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) })),
-              }
-            : isSplit(item)
-              ? item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) }))
-              : { id: itemId(item), ...tabEntry(item) }
-        ),
-      });
+      // (a closing tab may still be in the list while its row slides shut:
+      // it's not saved)
+      const savedSnapshot = keepTab => {
+        const keep = t => !t.closing && keepTab(t);
+        return {
+          tiles: gBrowser.tabs.filter(t => t.pinned && !t.closing).map(t => ({ id: itemId(t), ...tabEntry(t) })),
+          // (a split view's rows are saved as rows; its guest isn't saved)
+          block: listItems().filter(inBlock).filter(item => !item.closing && (!isGroup(item) || item.tabs.some(t => !t.closing))).flatMap(item =>
+            isGroup(item)
+              ? {
+                  folder: { id: folderId(item), label: item.label, color: item.color, collapsed: item.collapsed },
+                  tabs: item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) })),
+                }
+              : isSplit(item)
+                ? item.tabs.filter(t => isRow(t) && keep(t)).map(t => ({ id: itemId(t), ...tabEntry(t) }))
+                : { id: itemId(item), ...tabEntry(item) }
+          ),
+        };
+      };
       // The first browser window restores the list at launch; another one
       // builds it from the shared list when it opens. A window saves only once
       // it has (an earlier save would drop whatever isn't there yet), and not
@@ -871,6 +876,125 @@ try {
         },
       });
 
+      // --- motion: tabs opening, closing and being pinned ---
+      // A tab's row slides open when it opens and shut when it closes (the
+      // rows below follow, as folder rows do), and pinning or unpinning
+      // glides it, and whatever makes room, to its new place. Not at launch,
+      // during drags (they glide on their own) or with reduced motion.
+      const SETTLE = "cubic-bezier(0.32, 0.72, 0, 1)"; // (the folder rows' curve)
+      const motionOK = () => !win.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+        !dragRoot.hasAttribute("arc-starting") && !dragRoot.hasAttribute("arc-dragging");
+      // ([arc-folding]: see userChrome.css)
+      const slideRow = (el, open, done) => {
+        const height = el.getBoundingClientRect().height;
+        if (!height) {
+          done?.();
+          return;
+        }
+        for (const a of el.getAnimations()) {
+          if (a.id === "arc-fold") {
+            a.cancel();
+          }
+        }
+        el.setAttribute("arc-folding", "");
+        const full = { height: `${height}px`, opacity: 1 };
+        const none = { height: "0px", opacity: 0 };
+        const finish = () => {
+          el.removeAttribute("arc-folding");
+          done?.();
+        };
+        el.animate(open ? [none, full] : [full, none], { id: "arc-fold", duration: open ? 280 : 220, easing: SETTLE })
+          .finished.then(finish, finish);
+      };
+      // Closing: LibreWolf selects the next tab at once and removes the row
+      // in _endRemoveTab, which it can call late (it does, after its own
+      // closing animation, in the horizontal tab bar): the row slides shut
+      // first. Asked again while sliding (closing a window, say), it goes now.
+      const slidingShut = new Set();
+      const adoptedTabs = new WeakSet(); // dragged into another window
+      gBrowser.tabContainer.addEventListener("TabClose", e => e.detail?.adoptedBy && adoptedTabs.add(e.target));
+      const endRemoveTab = gBrowser._endRemoveTab.bind(gBrowser);
+      gBrowser._endRemoveTab = tab => {
+        if (!tab?._endRemoveArgs) {
+          return endRemoveTab(tab);
+        }
+        if (slidingShut.delete(tab)) {
+          return endRemoveTab(tab);
+        }
+        const [closeWindow, newTab] = tab._endRemoveArgs;
+        if (closeWindow || newTab || tab.pinned || tab.splitview || adoptedTabs.has(tab) ||
+            tab.hasAttribute("arc-peek-tab") || slidingShut.size >= 3 || !motionOK() ||
+            !tab.getBoundingClientRect().height) {
+          return endRemoveTab(tab);
+        }
+        slidingShut.add(tab);
+        slideRow(tab, false, () => slidingShut.delete(tab) && endRemoveTab(tab));
+        return undefined;
+      };
+      // Opening (a handful at a time: a whole session or folder opening at
+      // once just appears)
+      let openedLately = [];
+      gBrowser.tabContainer.addEventListener("TabOpen", e => {
+        const tab = e.target;
+        const now = win.performance.now();
+        openedLately = openedLately.filter(t => now - t < 150);
+        openedLately.push(now);
+        if (!motionOK() || openedLately.length > 3) {
+          return;
+        }
+        // (once it's settled: a Peek, the empty start page or a split view's
+        // tab don't slide)
+        win.requestAnimationFrame(() => {
+          if (tab.isConnected && !tab.pinned && !tab.closing && !tab.splitview &&
+              !tab.hasAttribute("arc-peek-tab") && !tab.hasAttribute("arc-start-page")) {
+            slideRow(tab, true);
+          }
+        });
+      });
+      // Pinning and unpinning: every item's place is noted before, and each
+      // glides from there to where it lands. A tab changing shape (a row
+      // becoming a tile, or back) grows into its new place instead: the
+      // tiles and the rows each clip to their own area, so it couldn't be
+      // seen travelling between them.
+      const glideItems = () => [
+        ...gBrowser.tabContainer.querySelectorAll(".tabbrowser-tab:not([closing]), .tab-group-label-container, tab-split-view-wrapper"),
+        doc.getElementById("tabbrowser-arrowscrollbox-periphery"),
+      ].filter(Boolean);
+      const notePlaces = () => (motionOK() ? new Map(glideItems().map(el => [el, el.getBoundingClientRect()])) : null);
+      const glideFrom = places => {
+        if (!places) {
+          return;
+        }
+        win.requestAnimationFrame(() => {
+          for (const [el, a] of places) {
+            const b = el.isConnected ? el.getBoundingClientRect() : null;
+            if (!b?.height || !a.height) {
+              continue;
+            }
+            if (Math.abs(a.width - b.width) > 4 || Math.abs(a.height - b.height) > 4) {
+              el.animate([{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "none" }],
+                { duration: 320, easing: SETTLE, composite: "add" });
+              continue;
+            }
+            const dx = a.left - b.left;
+            const dy = a.top - b.top;
+            if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) {
+              el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+                { duration: 320, easing: SETTLE, composite: "add" });
+            }
+          }
+        });
+      };
+      const withGlide = fn => () => {
+        const places = notePlaces();
+        fn();
+        glideFrom(places);
+      };
+      // (LibreWolf's own Pin Tab / Unpin Tab menu items too)
+      for (const id of ["context_pinTab", "context_unpinTab", "context_pinSelectedTabs", "context_unpinSelectedTabs"]) {
+        doc.getElementById(id)?.addEventListener("command", () => glideFrom(notePlaces()), true);
+      }
+
       // --- shortcuts ---
       const toggleRow = () => {
         const makeRow = !isRow(gBrowser.selectedTab);
@@ -937,14 +1061,14 @@ try {
           console.error(`Arc sidebar (${via}):`, e);
         }
       };
-      rebind("addBookmarkAsKb", "menu_bookmarkThisPage", () => run(toggleRow, "key-command"));   // Cmd+D (was Bookmark This Page)
-      rebind("bookmarkAllTabsKb", "menu_bookmarkAllTabs", () => run(toggleTile, "key-command")); // Cmd+Shift+D (was Bookmark All Tabs)
+      rebind("addBookmarkAsKb", "menu_bookmarkThisPage", () => run(withGlide(toggleRow), "key-command"));   // Cmd+D (was Bookmark This Page)
+      rebind("bookmarkAllTabsKb", "menu_bookmarkAllTabs", () => run(withGlide(toggleTile), "key-command")); // Cmd+Shift+D (was Bookmark All Tabs)
       // Direct route: catch the key press itself before anything else does
       win.addEventListener("keydown", e => {
         if (e.code === "KeyD" && e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
           e.stopPropagation();
-          run(e.shiftKey ? toggleTile : toggleRow, "keydown");
+          run(withGlide(e.shiftKey ? toggleTile : toggleRow), "keydown");
         }
       }, true);
 
@@ -1912,6 +2036,12 @@ try {
           goHome(tab);
         } else {
           gBrowser.discardBrowser(tab, true);
+        }
+        // it settles back in place, so it reads as put back, not closed
+        if (motionOK()) {
+          tab.querySelector(".tab-stack")?.animate(
+            [{ opacity: 0.2, transform: "scale(0.94)" }, { opacity: 1, transform: "none" }],
+            { duration: 360, easing: SETTLE });
         }
         // never left marked as the tab on screen (see below)
         if (!tab.selected && tab.hasAttribute("visuallyselected")) {

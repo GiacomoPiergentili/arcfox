@@ -425,6 +425,36 @@ check(!last.hasAttribute("arc-folding") && getComputedStyle(folderIcon, "::after
 return result({});
 """),
 
+    ("motion: tabs slide open and shut, pinning glides, a reset settles", r"""
+const frame = () => new Promise(k => requestAnimationFrame(k));
+const heights = async (el, n) => { const h = []; for (let i = 0; i < n; i++) { await frame(); h.push(el.isConnected ? Math.round(R(el).h) : -1); } return h; };
+const t = gBrowser.addTab("about:robots", {triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()});
+const opening = await heights(t, 22);
+check(opening.some(h => h > 2 && h < 34) && opening.at(-1) >= 34, "a new tab's row slides open: " + opening.join(","));
+await wait(300);
+const count = gBrowser.tabs.length;
+gBrowser.removeTab(t);
+check(gBrowser.tabs.length === count - 1 || t.closing, "a closing tab leaves the list at once, or is marked closing (only its row lingers): " + count + " " + gBrowser.tabs.length + " " + t.closing);
+const closing = await heights(t, 22);
+check(closing.some(h => h > 2 && h < 34), "its row slides shut: " + closing.join(","));
+check(!t.isConnected, "...and is gone after");
+const n = gBrowser.tabs.find(x => x.label === "Normal 1");
+gBrowser.selectedTab = n; await wait(400);
+const y0 = R(n).y;
+document.getElementById("addBookmarkAsKb").doCommand();
+const ys = []; for (let i = 0; i < 20; i++) { await frame(); ys.push(Math.round(R(n).y)); }
+check(isRow(n) && ys.some(y => y < y0 - 2 && y > ys.at(-1) + 2), "Cmd+D glides the tab up into the rows: " + y0 + " " + ys.join(","));
+await wait(400);
+document.getElementById("addBookmarkAsKb").doCommand(); await wait(600);
+check(!isRow(n), "...and back");
+const row = gBrowser.tabs.find(x => x.label === "Row B");
+gBrowser.selectedTab = row; await wait(500);
+gBrowser.removeTab(row);
+const op = []; for (let i = 0; i < 30; i++) { await frame(); op.push(Number(getComputedStyle(row.querySelector(".tab-stack")).opacity)); }
+check(row.isConnected && op.some(o => o < 0.6) && op.at(-1) === 1, "closing a pinned row resets it with a settle: " + op.map(o => o.toFixed(1)).join(","));
+return result({});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);
