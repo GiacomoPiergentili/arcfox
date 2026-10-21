@@ -31,6 +31,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Peek motion: the card grows out of the clicked link once its page has drawn and shrinks back on close; no black frames (the page underneath is kept drawn), no empty card.
 - [x] Option+click a link in any tab opens it in Peek (as in Zen).
 - [x] Peek: links to other sites from tiles and pinned rows open in a card over the dimmed pinned page (Esc / click outside / Cmd+W / switching tabs close it; Open as Tab; Split View from a row).
 - [x] Drag torture test: drags that leave the sidebar and come back, drops on the page (no more tearing off into a new window), tiles dropped into folders.

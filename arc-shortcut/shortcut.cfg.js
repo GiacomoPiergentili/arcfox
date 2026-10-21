@@ -36,26 +36,35 @@ try {
 
     // Option+click on a link in a page opens it in Peek, from any tab (as in
     // Zen). LibreWolf does nothing with it otherwise (no navigation, no
-    // download): where a clicked link opens is decided here, so the click
-    // asks for a new tab in front, which the window then shows as a Peek
-    // (see "Peek" below). Only clicks in pages: bookmarks, menus and the URL
-    // bar keep their own meaning for Option.
+    // download): where a clicked link opens is decided in BrowserUtils, so
+    // the click asks for a new tab in front, which the window then shows as a
+    // Peek (see "Peek" below). Only clicks in pages: bookmarks, menus and the
+    // URL bar keep their own meaning for Option. Set up once the first
+    // window is open: loading LibreWolf's modules this early in start-up
+    // (this file runs before almost anything) could stall it.
     let altPeekAt = 0;
-    try {
-      const { BrowserUtils } = ChromeUtils.importESModule("resource://gre/modules/BrowserUtils.sys.mjs");
-      const whereToOpenLink = BrowserUtils.whereToOpenLink;
-      BrowserUtils.whereToOpenLink = function (e, ignoreButton, ignoreAlt) {
-        const where = whereToOpenLink.call(this, e, ignoreButton, ignoreAlt);
-        const fromPage = !!e && typeof e.href === "string" && "referrerInfo" in e;
-        if (where === "current" && fromPage && e.altKey && !ignoreAlt && !e.shiftKey && !e.ctrlKey && !e.metaKey && e.button === 0) {
-          altPeekAt = Date.now();
-          return prefs.getBoolPref("browser.tabs.loadInBackground", true) ? "tabshifted" : "tab";
-        }
-        return where;
-      };
-    } catch (e) {
-      console.error("Arc sidebar (Option+click Peek):", e);
-    }
+    let altPeekHooked = false;
+    const hookAltPeek = () => {
+      if (altPeekHooked) {
+        return;
+      }
+      altPeekHooked = true;
+      try {
+        const { BrowserUtils } = ChromeUtils.importESModule("resource://gre/modules/BrowserUtils.sys.mjs");
+        const whereToOpenLink = BrowserUtils.whereToOpenLink;
+        BrowserUtils.whereToOpenLink = function (e, ignoreButton, ignoreAlt) {
+          const where = whereToOpenLink.call(this, e, ignoreButton, ignoreAlt);
+          const fromPage = !!e && typeof e.href === "string" && "referrerInfo" in e;
+          if (where === "current" && fromPage && e.altKey && !ignoreAlt && !e.shiftKey && !e.ctrlKey && !e.metaKey && e.button === 0) {
+            altPeekAt = Date.now();
+            return prefs.getBoolPref("browser.tabs.loadInBackground", true) ? "tabshifted" : "tab";
+          }
+          return where;
+        };
+      } catch (e) {
+        console.error("Arc sidebar (Option+click Peek):", e);
+      }
+    };
 
     function toggleSidebarMode() {
       const current = prefs.getStringPref(PREF, "always-show");
@@ -67,6 +76,8 @@ try {
       // Marks the window as running this script: userChrome.css shows a
       // notice when it's missing (e.g. after a LibreWolf update replaced it)
       doc.documentElement.setAttribute("arc-script", "");
+      // (a window is open: LibreWolf is far enough along for this)
+      win.setTimeout(hookAltPeek, 0);
       // Reuse the existing Cmd+S key: detach it from "Save Page" and run our toggle instead
       const key = doc.getElementById("key_savePage");
       if (!key) {
@@ -1856,7 +1867,35 @@ try {
       const expandButton = peekButton("expand", "Open as Tab");
       const closeButton = peekButton("close", "Close");
       doc.body.append(peekBar);
-      let peek = null; // { tab, home }
+      const peekSpinner = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+      peekSpinner.id = "arc-peek-spinner";
+      doc.body.append(peekSpinner);
+      let peek = null; // { tab, home, origin }
+      // The page under a Peek stays drawn: LibreWolf drops what a tab it
+      // switches away from has drawn (one black frame), unless told not to
+      const keepDrawn = (tab, on) => {
+        try {
+          tab.linkedBrowser.preserveLayers(on);
+          if (on) {
+            tab.linkedBrowser.renderLayers = true;
+            tab.linkedBrowser.docShellIsActive = true;
+          }
+        } catch {}
+      };
+      // where a page was last pressed: the card grows out of the link
+      let lastPagePress = null;
+      win.addEventListener("pointerdown", e => {
+        if (e.target?.localName === "browser") {
+          lastPagePress = { x: e.clientX, y: e.clientY, at: win.performance.now() };
+        }
+      }, true);
+      // where the card ends up: 7.5% in from the page's edges
+      const cardBox = () => {
+        const r = gBrowser.tabpanels.getBoundingClientRect();
+        return { left: r.left + r.width * 0.075, top: r.top + r.height * 0.075, width: r.width * 0.85, height: r.height * 0.85 };
+      };
+      const reducedMotion = () => win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const EASE = "cubic-bezier(0.2, 0.9, 0.3, 1)"; // fast start, soft landing
       // (from where the card ends up, 7.5% in from the page's edges: it's
       // still growing into place when this runs)
       const placePeekBar = () => {
@@ -1876,26 +1915,138 @@ try {
         home.setAttribute("arc-peek-home", "");
         dragRoot.setAttribute("arc-peek", "");
         splitButton.hidden = home.pinned || !!home.splitview;
-        whenSwitched(() => {
+        const press = lastPagePress && win.performance.now() - lastPagePress.at < 3000 ? lastPagePress : null;
+        const box = cardBox();
+        peek.origin = press ? { x: press.x - box.left, y: press.y - box.top } : null;
+        // The pinned page dims right away (and is kept drawn: LibreWolf puts
+        // the page it switched away from to sleep); the card waits, hidden,
+        // until its page has drawn (a spinner at the link if that takes a
+        // moment), then grows out of the link: never an empty or black card
+        const show = () => {
           if (peek?.tab !== tab) {
-            return;
+            return false;
           }
           gBrowser.showSplitViewPanels([home, tab]);
           doc.getElementById(home.linkedPanel)?.setAttribute("arc-peek-under", "");
           doc.getElementById(tab.linkedPanel)?.setAttribute("arc-peek-card", "");
+          return true;
+        };
+        const card = doc.getElementById(tab.linkedPanel);
+        card?.setAttribute("arc-peek-waiting", "");
+        keepDrawn(home, true);
+        show();
+        const keepHomeDrawn = win.setInterval(() => {
+          if (peek?.tab !== tab) {
+            win.clearInterval(keepHomeDrawn);
+            return;
+          }
+          try {
+            home.linkedBrowser.docShellIsActive = true;
+            home.linkedBrowser.renderLayers = true;
+          } catch {}
+        }, 50);
+        const spinnerAt = press || { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+        peekSpinner.style.left = `${spinnerAt.x}px`;
+        peekSpinner.style.top = `${spinnerAt.y}px`;
+        const spinnerTimer = win.setTimeout(() => peek?.tab === tab && peekSpinner.setAttribute("shown", ""), 150);
+        let revealed = false;
+        const reveal = () => {
+          if (revealed || !show()) {
+            return;
+          }
+          revealed = true;
+          win.clearTimeout(spinnerTimer);
+          win.clearInterval(keepHomeDrawn);
+          gBrowser.removeTabsProgressListener(listener);
+          peekSpinner.removeAttribute("shown");
+          card?.removeAttribute("arc-peek-waiting");
+          if (card && !reducedMotion()) {
+            // out of the link: from a tenth of its size at the press point (or
+            // from the middle, a little smaller)
+            card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
+            card.animate(peek.origin
+              ? [{ transform: "scale(0.1)", opacity: 0 }, { opacity: 1, offset: 0.25 }, { transform: "scale(1)", opacity: 1 }]
+              : [{ transform: "scale(0.96)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }],
+            { duration: peek.origin ? 340 : 220, easing: EASE });
+          }
           peekBar.setAttribute("shown", "");
           placePeekBar();
+          peekBar.animate?.([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 340, easing: "ease-out" });
           tab.linkedBrowser.focus();
-        });
+        };
+        // ready: its page's document has arrived (then a beat to draw it), or
+        // it finished loading; at the latest after 4s
+        const listener = {
+          onLocationChange(browser, webProgress, request, location) {
+            if (browser === tab.linkedBrowser && webProgress.isTopLevel && location && !win.isBlankPageURL(location.spec)) {
+              win.setTimeout(() => win.requestAnimationFrame(() => win.requestAnimationFrame(reveal)), 120);
+            }
+          },
+          onStateChange(browser, webProgress, request, flags) {
+            const { STATE_STOP, STATE_IS_WINDOW } = Ci.nsIWebProgressListener;
+            if (browser === tab.linkedBrowser && webProgress.isTopLevel && flags & STATE_STOP && flags & STATE_IS_WINDOW && !win.isBlankPageURL(browser.currentURI.spec)) {
+              win.requestAnimationFrame(() => win.requestAnimationFrame(reveal));
+            }
+          },
+        };
+        gBrowser.addTabsProgressListener(listener);
+        win.setTimeout(reveal, 4000);
       };
+      // LibreWolf takes the two pages down when it finishes switching to the
+      // Peek's tab (to it that's a tab outside any split view): put them back
+      // before the next frame is drawn
+      new win.MutationObserver(() => {
+        if (peek && !closing && !gBrowser.tabpanels.hasAttribute("splitview")) {
+          gBrowser.showSplitViewPanels([peek.home, peek.tab]);
+        }
+      }).observe(gBrowser.tabpanels, { attributes: true, attributeFilter: ["splitview"] });
       // how: "close" (gone), "tab" (a normal tab), "split" (beside the row),
       // "away" (another tab was selected: gone), "gone" (closed already)
+      let closing = false;
       const closePeek = how => {
+        if (!peek || closing) {
+          return;
+        }
+        // "close": back into the link; "tab": out to the whole page; then put
+        // away (switching tabs or a closed tab: at once)
+        const card = doc.getElementById(peek.tab.linkedPanel);
+        const under = doc.getElementById(peek.home.linkedPanel);
+        if ((how === "close" || how === "tab") && card && !reducedMotion()) {
+          closing = true;
+          peekBar.removeAttribute("shown");
+          let anim;
+          if (how === "tab") {
+            const box = cardBox();
+            const r = gBrowser.tabpanels.getBoundingClientRect();
+            card.style.transformOrigin = `${r.left + r.width / 2 - box.left}px ${r.top + r.height / 2 - box.top}px`;
+            anim = card.animate([{ transform: "scale(1)" }, { transform: `scale(${r.width / box.width}, ${r.height / box.height})`, borderRadius: "0px" }], { duration: 240, easing: EASE, fill: "forwards" });
+          } else {
+            card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
+            anim = card.animate([{ transform: "scale(1)", opacity: 1 }, { opacity: 1, offset: 0.5 }, { transform: peek.origin ? "scale(0.1)" : "scale(0.96)", opacity: 0 }], { duration: 220, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+          }
+          under?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "forwards", pseudoElement: "::after" });
+          anim.finished.catch(() => {}).then(() => {
+            closing = false;
+            card.getAnimations().forEach(a => a.cancel());
+            under?.getAnimations({ subtree: true }).forEach(a => a.cancel());
+            finishPeek(how);
+          });
+          return;
+        }
+        finishPeek(how);
+      };
+      const finishPeek = how => {
         if (!peek) {
           return;
         }
         const { tab, home } = peek;
         peek = null;
+        doc.getElementById(tab.linkedPanel)?.style.removeProperty("transform-origin");
+        doc.getElementById(tab.linkedPanel)?.removeAttribute("arc-peek-waiting");
+        if (home.isConnected) {
+          keepDrawn(home, false);
+        }
+        peekSpinner.removeAttribute("shown");
         peekBar.removeAttribute("shown");
         dragRoot.removeAttribute("arc-peek");
         home.removeAttribute("arc-peek-home");
@@ -1936,6 +2087,7 @@ try {
         const asked = Date.now() - altPeekAt < 1500;
         if (!peek && opener && opener.selected && !opener.splitview && (isPinnedish(opener) || asked)) {
           tab._arcPeekFrom = { opener, at: win.performance.now() };
+          keepDrawn(opener, true); // (before LibreWolf switches away from it)
           altPeekAt = 0;
         }
       });

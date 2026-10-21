@@ -52,6 +52,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 ### Peek (as in Arc)
 - A link to another site clicked in a tile or a pinned row opens in a card floating over the pinned page (dimmed), instead of replacing it. Links within the same site navigate as usual.
 - **Option+click** any link, in any tab, to open it in Peek (as in Zen).
+- The card grows out of the link you clicked once its page has drawn (a small spinner at the link while it loads), and shrinks back into it when closed; Open as Tab grows it to the whole page.
 - The card has buttons above its top-right corner: **Open as Tab** (keep it as a normal tab), **Open in Split View** (side by side with the page underneath; not from a tile) and **Close**.
 - Esc, a click on the dimmed page, Cmd+W or switching to another tab closes it; the page is then gone (it's in Recently Closed).
 

@@ -465,7 +465,7 @@ def write_prefs(profile):
             f.write("user_pref(%s, %s);\n" % (json.dumps(key), json.dumps(value)))
 
 
-def launch(profile):
+def launch(profile, attempt=1):
     log = open(os.path.join(profile, "librewolf.log"), "w")
     proc = subprocess.Popen([APP, "-profile", profile, "-no-remote", "--marionette",
                              "--remote-allow-system-access", "about:blank"],
@@ -477,7 +477,16 @@ def launch(profile):
         except OSError:
             time.sleep(0.5)
     time.sleep(4)
-    return proc, Marionette()
+    mn = Marionette()
+    # A brand-new profile now and then starts without userChrome.css (a
+    # LibreWolf start-up quirk, not ours): start it again rather than test
+    # without the look
+    loaded = mn.js("return !!getComputedStyle(root).getPropertyValue('--arc-tab-height');")
+    if not loaded and attempt < 3:
+        print("(userChrome.css didn't load in the test browser; starting it again)")
+        quit(proc, mn)
+        return launch(profile, attempt + 1)
+    return proc, mn
 
 
 def quit(proc, mn):
