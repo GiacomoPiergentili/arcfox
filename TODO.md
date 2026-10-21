@@ -4,7 +4,8 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-Nothing queued: pick from "Later" or "Bigger projects".
+- [ ] **Test suite**: one command that launches a test profile and checks the key behaviors (rows and folders survive a restart, the Cmd+T bar, closing rules, spacing), to catch regressions and LibreWolf-update breakage.
+- [ ] **Multiple windows**: other windows don't show your tiles, pinned rows and folders (tiles are per-window LibreWolf pinned tabs; rows are restored only in the first window). In Arc every window shows the same ones.
 
 ## Later
 
@@ -25,6 +26,8 @@ Nothing queued.
 
 ## Done
 
+- [x] Video fullscreen fills the screen (no page-card gutter, corners or shadow).
+- [x] Accessibility: the sidebar button and the pinned-page dot have proper names for VoiceOver.
 - [x] Command bar screenshot with suggestions (a macOS capture: LibreWolf's own snapshot doesn't draw the suggestion list).
 - [x] The auto-hide sidebar measures the pinned sidebar's color itself (at launch, on theme and light/dark changes, when the window becomes active, when the sidebar gets pinned), so it matches with any theme or wallpaper.
 - [x] Fixed: a quick Cmd+T right after Enter was ignored, and the bar could fill with the previous tab's address while it loaded.

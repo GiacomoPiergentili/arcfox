@@ -60,6 +60,8 @@ try {
         sidebarButton.id = "arc-sidebar-button";
         sidebarButton.className = "toolbarbutton-1";
         sidebarButton.setAttribute("tooltiptext", "Show or Auto-Hide Sidebar (⌘S)");
+        // its name for VoiceOver (toolbar buttons show only their icon)
+        sidebarButton.setAttribute("label", "Sidebar");
         sidebarButton.addEventListener("command", toggleSidebarMode);
         buttonbox.after(sidebarButton);
       }
@@ -282,6 +284,8 @@ try {
           dot = doc.createXULElement("box");
           dot.className = "arc-home-dot";
           dot.setAttribute("tooltiptext", "Back to pinned page");
+          dot.setAttribute("role", "button");
+          dot.setAttribute("aria-label", "Back to pinned page");
           // don't let the tab itself react (select / start a drag)
           dot.addEventListener("mousedown", e => e.stopPropagation());
           dot.addEventListener("click", e => {

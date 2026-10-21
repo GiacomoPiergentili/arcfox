@@ -1214,6 +1214,18 @@ panel toolbarseparator {
   top: var(--fullscreen-menubar-shift, 0px) !important;
 }
 
+/* A video (or any page) in fullscreen fills the screen: no gutter, corners
+   or shadow around it (they showed as gray lines above and below). The
+   doubled id outranks the auto-hide mode's own page margin. */
+:root[inDOMFullscreen] #tabbrowser-tabbox#tabbrowser-tabbox {
+  margin: 0 !important;
+}
+
+:root[inDOMFullscreen] :is(#tabbrowser-tabpanels, .browserStack, .browserStack > browser, .browserSidebarContainer) {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
 /* ---------- Fullscreen (auto-hide) ---------- */
 /* The open sidebar floats over the page, same as in a window. */
 
