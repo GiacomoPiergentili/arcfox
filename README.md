@@ -49,6 +49,11 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - A split of normal tabs comes back after a restart (when LibreWolf restores your tabs); a row comes back on its own.
 - Tiles stay out: LibreWolf can't put its pinned tabs in a split view.
 
+### Peek (as in Arc)
+- A link to another site clicked in a tile or a pinned row opens in a card floating over the pinned page (dimmed), instead of replacing it. Links within the same site navigate as usual.
+- The card has buttons above its top-right corner: **Open as Tab** (keep it as a normal tab), **Open in Split View** (from a pinned row: side by side with it) and **Close**.
+- Esc, a click on the dimmed page, Cmd+W or switching to another tab closes it; the page is then gone (it's in Recently Closed).
+
 ### Closing
 - Closing a row or tile resets it (back to its pinned page, unloaded) instead of closing it.
 - After closing a row, a tile or the last normal tab you go to the most recently used open row, else the empty page with the bar, never to an unloaded row that would start loading.
@@ -74,7 +79,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 | Cmd+W | On a row or tile: reset it to its pinned page. On a normal tab: close it |
 | Cmd+Shift+C | Copy the page's address ("Link Copied"); was the developer tools' element picker (Cmd+Option+C still opens them) |
 | Cmd+1…9 | Go to the tiles in order, then on to the pinned rows |
-| Esc | Close the command bar |
+| Esc | Close the command bar, or a Peek |
 
 ## Install
 
@@ -142,6 +147,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 17. **Split view, every way in**: all 27 ways a split can start were tested; pinned rows can now be split (the pair stays in the row's spot, the saved list never changes), LibreWolf's "choose a tab" picker and restored split views work (our new-tab handling used to pull their tabs out), tabs can come from another window, and Cmd+Shift+D to un-tile puts the tab below the rows instead of above them.
 18. **Drag and drop, checked with real mouse drags** (recorded frame by frame, positions logged every 30ms): fixed tiles dropped at the end instead of where they're dropped, the tiles not making room, the rows opening a stray slot, the list jumping when the tile grid shrinks or a folder is dragged (our CSS overrode LibreWolf's own offsets twice over), a split pair dragged into the rows snapping back, a tab dropped on the page left drawn 23px off in its pair, preview cards popping up mid-drag, and a tile shown as a row with its title against the icon.
 19. **Drag torture test** (random circles in and out of the sidebar, detours over the page, every kind of item, checked against a list of invariants afterwards): a drag that left the sidebar was treated as over, so coming back left tabs squeezed and fighting LibreWolf's own drag state; a tab dropped on its own page was torn off into a new window; a tile dropped inside a folder landed outside it.
+20. **Peek** (as in Arc): links to other sites from tiles and pinned rows open in a floating card over the pinned page; open as tab, split, or close.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

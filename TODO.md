@@ -13,7 +13,6 @@ Nothing queued.
 ## Bigger projects
 
 - [ ] **Spaces**: several sidebars (e.g. work / personal) to switch between, as in Arc.
-- [ ] **Peek**: links opened from a tile show in a floating preview window instead of replacing the tile's page.
 
 ## Known limitations
 
@@ -22,6 +21,7 @@ Nothing queued.
 - The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
+- Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when LibreWolf quits comes back as a normal tab. Split View from a Peek works only from pinned rows (LibreWolf can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
 - Tiles can't be split (LibreWolf keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
 - Dragging a tab in from another window is tested with simulated events only. Real drags were checked by hand-run recordings (`~/.arc-drag`, outside the repo), not in the test suite.
 - When a tab leaves the tiles mid-drag, LibreWolf sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
@@ -31,6 +31,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Peek: links to other sites from tiles and pinned rows open in a card over the dimmed pinned page (Esc / click outside / Cmd+W / switching tabs close it; Open as Tab; Split View from a row).
 - [x] Drag torture test: drags that leave the sidebar and come back, drops on the page (no more tearing off into a new window), tiles dropped into folders.
 - [x] Drag and drop glitches (found with recorded real drags): tile drop position, tiles making room, stray row slot, jumps when the grid shrinks or a folder is dragged, split pairs into/out of the rows, leftover offset after a page drop, preview cards during drags, dragged tile's icon spacing.
 - [x] Split view's sidebar item restyled as one 32px row (segmented-control style, whole pixels, folder line continuous).

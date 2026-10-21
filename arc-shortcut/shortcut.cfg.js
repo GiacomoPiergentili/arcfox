@@ -1785,6 +1785,176 @@ try {
         };
       }
 
+      // --- Peek (as in Arc) ---
+      // A link to another site clicked in a tile or a pinned row opens in a
+      // card floating over the pinned page (dimmed), instead of replacing it.
+      // LibreWolf already opens such links in a new tab from pinned tabs (its
+      // "app tab" flag); rows get the flag too. That new tab is the Peek:
+      // it's selected (the URL bar shows its address) but hidden from the
+      // sidebar, where the pinned item stays highlighted; LibreWolf's split
+      // view machinery draws both pages. Esc, a click on the dimmed page, the
+      // card's close button or switching tabs closes it (and it's gone, in
+      // Recently Closed); it can also become a normal tab, or a split view
+      // with a pinned row.
+      const PEEK = "arc-peek-tab";
+      const setAppTab = tab => {
+        try {
+          if (tab.linkedBrowser?.browsingContext) {
+            tab.linkedBrowser.browsingContext.isAppTab = tab.pinned || isRow(tab);
+          }
+        } catch {}
+      };
+      for (const tab of gBrowser.tabs) {
+        setAppTab(tab);
+      }
+      gBrowser.tabContainer.addEventListener("TabBrowserInserted", e => setAppTab(e.target));
+      gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
+        if (e.detail?.changed?.includes(ROW)) {
+          setAppTab(e.target);
+        }
+      });
+      new win.MutationObserver(records => {
+        for (const r of records) {
+          setAppTab(r.target);
+        }
+      }).observe(gBrowser.tabContainer, { subtree: true, attributes: true, attributeFilter: [ROW] });
+
+      const peekBar = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+      peekBar.id = "arc-peek-bar";
+      const peekButton = (name, label) => {
+        const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
+        b.className = `arc-peek-${name}`;
+        b.title = label;
+        b.setAttribute("aria-label", label);
+        peekBar.append(b);
+        return b;
+      };
+      const splitButton = peekButton("split", "Open in Split View");
+      const expandButton = peekButton("expand", "Open as Tab");
+      const closeButton = peekButton("close", "Close");
+      doc.body.append(peekBar);
+      let peek = null; // { tab, home }
+      // (from where the card ends up, 7.5% in from the page's edges: it's
+      // still growing into place when this runs)
+      const placePeekBar = () => {
+        if (!peek) {
+          return;
+        }
+        const r = gBrowser.tabpanels.getBoundingClientRect();
+        const right = Math.round(r.right - r.width * 0.075);
+        const top = Math.round(r.top + r.height * 0.075);
+        peekBar.style.left = `${right - peekBar.offsetWidth}px`;
+        peekBar.style.top = `${top - peekBar.offsetHeight - 8}px`;
+      };
+      win.addEventListener("resize", placePeekBar);
+      const openPeek = (tab, home) => {
+        peek = { tab, home };
+        tab.setAttribute(PEEK, "");
+        home.setAttribute("arc-peek-home", "");
+        dragRoot.setAttribute("arc-peek", "");
+        splitButton.hidden = !isRow(home) || !!home.splitview;
+        whenSwitched(() => {
+          if (peek?.tab !== tab) {
+            return;
+          }
+          gBrowser.showSplitViewPanels([home, tab]);
+          doc.getElementById(home.linkedPanel)?.setAttribute("arc-peek-under", "");
+          doc.getElementById(tab.linkedPanel)?.setAttribute("arc-peek-card", "");
+          peekBar.setAttribute("shown", "");
+          placePeekBar();
+          tab.linkedBrowser.focus();
+        });
+      };
+      // how: "close" (gone), "tab" (a normal tab), "split" (beside the row),
+      // "away" (another tab was selected: gone), "gone" (closed already)
+      const closePeek = how => {
+        if (!peek) {
+          return;
+        }
+        const { tab, home } = peek;
+        peek = null;
+        peekBar.removeAttribute("shown");
+        dragRoot.removeAttribute("arc-peek");
+        home.removeAttribute("arc-peek-home");
+        tab.removeAttribute(PEEK);
+        for (const t of [home, tab]) {
+          const panel = doc.getElementById(t.linkedPanel);
+          panel?.removeAttribute("arc-peek-under");
+          panel?.removeAttribute("arc-peek-card");
+        }
+        try {
+          gBrowser.tabpanels.removeTabsFromSplitview([home, tab]);
+        } catch {}
+        if (how === "gone" && gBrowser.selectedTab === tab && home.isConnected) {
+          gBrowser.selectedTab = home; // (Cmd+W on it: back to the pinned page)
+        }
+        if (how === "close" || how === "away") {
+          if (gBrowser.selectedTab === tab && home.isConnected) {
+            gBrowser.selectedTab = home;
+          }
+          if (tab.isConnected && !tab.closing) {
+            removeTabForPeek(tab, { animate: false });
+          }
+        } else if (how === "tab") {
+          moveToRowBlockEnd(tab); // the first normal tab
+        } else if (how === "split" && home.isConnected) {
+          gBrowser.addTabSplitView([home, tab], { insertBefore: home });
+          gBrowser.selectedTab = tab;
+        }
+      };
+      closeButton.addEventListener("click", () => closePeek("close"));
+      expandButton.addEventListener("click", () => closePeek("tab"));
+      splitButton.addEventListener("click", () => closePeek("split"));
+      // a link from a pinned page that opens in front: the Peek
+      gBrowser.tabContainer.addEventListener("TabOpen", e => {
+        const tab = e.target;
+        const opener = tab.openerTab;
+        if (!peek && opener && opener.selected && isPinnedish(opener) && !opener.splitview) {
+          tab._arcPeekFrom = { opener, at: win.performance.now() };
+        }
+      });
+      gBrowser.tabContainer.addEventListener("TabSelect", e => {
+        const tab = e.target;
+        if (peek && tab !== peek.tab) {
+          closePeek("away");
+        }
+        const from = tab._arcPeekFrom;
+        delete tab._arcPeekFrom;
+        if (from && win.performance.now() - from.at < 2000 && e.detail?.previousTab === from.opener && from.opener.isConnected) {
+          openPeek(tab, from.opener);
+        }
+      });
+      // Closing the Peek's tab (Cmd+W) closes the Peek; any other way it
+      // goes, the Peek is put away once LibreWolf is done closing it
+      const removeTabForPeek = gBrowser.removeTab;
+      gBrowser.removeTab = (tab, options) => {
+        if (peek && tab === peek.tab && !tab.closing) {
+          closePeek("close");
+          return undefined;
+        }
+        return removeTabForPeek(tab, options);
+      };
+      gBrowser.tabContainer.addEventListener("TabClose", e => {
+        if (peek && (e.target === peek.tab || e.target === peek.home)) {
+          const gone = e.target === peek.tab;
+          win.setTimeout(() => closePeek(gone ? "gone" : "away"), 0);
+        }
+      });
+      // a click on the dimmed page, or Esc, closes it
+      doc.getElementById("tabbrowser-tabpanels")?.addEventListener("mousedown", e => {
+        if (peek && e.button === 0 && e.target?.hasAttribute?.("arc-peek-under")) {
+          e.preventDefault();
+          e.stopPropagation();
+          closePeek("close");
+        }
+      }, true);
+      win.addEventListener("keydown", e => {
+        if (peek && e.key === "Escape" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          closePeek("close");
+        }
+      }, true);
+
       // --- the same sidebar in every window (as in Arc) ---
       // When another window saves the shared list, this window makes its own
       // tiles, rows and folders match it: missing ones are created (unloaded),

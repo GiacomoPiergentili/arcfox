@@ -1593,3 +1593,134 @@ split-view-footer {
     outline-offset: -2px;
   }
 }
+
+/* ---------- Peek (as in Arc) ----------
+   A link to another site from a tile or a pinned row opens in a card over
+   the pinned page, which is dimmed ([arc-peek] and the panel attributes
+   come from the shortcut script). The pinned item stays highlighted in the
+   sidebar; the Peek's own tab isn't listed. */
+#tabbrowser-tabs .tabbrowser-tab[arc-peek-tab] {
+  display: none !important;
+}
+
+:root[arc-peek] #tabbrowser-tabs .tabbrowser-tab[arc-peek-home] .tab-background {
+  background: var(--arc-fill-selected) !important;
+}
+
+:root[arc-peek] #tabbrowser-tabpanels {
+  position: relative;
+}
+
+/* the pinned page, full size and dimmed (a click there closes the Peek) */
+:root[arc-peek] #tabbrowser-tabpanels .browserSidebarContainer[arc-peek-under] {
+  position: relative;
+  flex: 1 !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  outline: none !important;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    background: rgba(0, 0, 0, 0.3);
+    animation: arc-peek-dim 200ms ease-out;
+  }
+}
+
+/* the card: centered, 85% of the page */
+:root[arc-peek] #tabbrowser-tabpanels .browserSidebarContainer[arc-peek-card] {
+  position: absolute !important;
+  inset: 7.5% !important;
+  z-index: 2;
+  margin: 0 !important;
+  border-radius: var(--arc-radius) !important;
+  box-shadow: var(--arc-shadow-3) !important;
+  outline: none !important;
+  animation: arc-peek-in 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* no split view focus ring or address label here */
+:root[arc-peek] #tabbrowser-tabpanels .browserSidebarContainer:is([arc-peek-card], [arc-peek-under]) {
+  > .browserContainer {
+    outline: none !important;
+    border-color: transparent !important;
+  }
+
+  split-view-footer {
+    display: none !important;
+  }
+}
+
+@keyframes arc-peek-dim {
+  from { opacity: 0; }
+}
+
+@keyframes arc-peek-in {
+  from { opacity: 0; scale: 0.96; }
+}
+
+/* its buttons, above the card's top right corner */
+#arc-peek-bar {
+  position: fixed;
+  z-index: 16;
+  display: none;
+  gap: 4px;
+  padding: 4px;
+  border-radius: calc(var(--arc-radius-inner) + 4px);
+  background: var(--arc-panel);
+  box-shadow: var(--arc-shadow-2);
+
+  &[shown] {
+    display: flex;
+  }
+
+  > button {
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--arc-radius-inner);
+    background-color: transparent;
+    color: inherit;
+
+    &[hidden] {
+      display: none;
+    }
+
+    &::before {
+      content: "";
+      display: block;
+      width: 16px;
+      height: 16px;
+      margin: auto;
+      background-color: currentColor;
+      mask: var(--arc-peek-icon) center / contain no-repeat;
+    }
+
+    &:hover {
+      background-color: var(--arc-fill-hover);
+    }
+
+    &:hover:active {
+      background-color: var(--arc-fill-selected);
+    }
+  }
+
+  > .arc-peek-split { --arc-peek-icon: url("chrome://browser/skin/split-view-right-16.svg"); }
+  > .arc-peek-expand { --arc-peek-icon: url("chrome://global/skin/icons/open-in-new.svg"); }
+  > .arc-peek-close { --arc-peek-icon: url("chrome://global/skin/icons/close.svg"); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[arc-peek] #tabbrowser-tabpanels .browserSidebarContainer:is([arc-peek-card], [arc-peek-under]),
+  :root[arc-peek] #tabbrowser-tabpanels .browserSidebarContainer[arc-peek-under]::after {
+    animation: none;
+  }
+}
+

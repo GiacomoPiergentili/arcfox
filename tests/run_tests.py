@@ -313,6 +313,41 @@ gBrowser.removeTab(g2, {animate: false}); await wait(500);
 return result({});
 """),
 
+    ("Peek: links from a tile open in a card", r"""
+const tile = tiles()[0];
+check(tile.linkedBrowser.browsingContext.isAppTab, "a tile opens other sites' links elsewhere");
+check(rows().every(r => !r.linkedBrowser?.browsingContext || r.linkedBrowser.browsingContext.isAppTab), "so do pinned rows");
+const open = async () => {
+  gBrowser.selectedTab = tile; await wait(600);
+  // what a link to another site does in a pinned page: a new tab from it, in front
+  const t = gBrowser.addTab(page("Peeked"), {triggeringPrincipal: P, openerBrowser: tile.linkedBrowser});
+  gBrowser.selectedTab = t; await wait(1200);
+  return t;
+};
+let t = await open();
+const tp = R(gBrowser.tabpanels);
+const card = document.querySelector("#tabbrowser-tabpanels [arc-peek-card]");
+const under = document.querySelector("#tabbrowser-tabpanels [arc-peek-under]");
+check(root.hasAttribute("arc-peek") && card && under, "the new tab opens as a Peek");
+if (card && under) {
+  const c = R(card), u = R(under);
+  check(near(u.w, tp.w, 1) && near(u.h, tp.h, 1), "the pinned page stays full size underneath");
+  check(near(c.x - tp.x, tp.w * 0.075, 1) && near(tp.r - c.r, tp.w * 0.075, 1) && near(c.y - tp.y, tp.h * 0.075, 1), "the card is centered, 7.5% in");
+}
+check(R(t).h === 0, "the Peek isn't listed in the sidebar");
+check(tile.hasAttribute("arc-peek-home"), "the tile stays highlighted");
+const bar = document.getElementById("arc-peek-bar");
+check(bar.hasAttribute("shown") && bar.querySelector(".arc-peek-split").hidden, "its buttons show (no split from a tile)");
+window.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); await wait(800);
+check(!root.hasAttribute("arc-peek") && !t.isConnected && gBrowser.selectedTab === tile, "Esc closes it, back to the tile");
+check(!gBrowser.tabpanels.hasAttribute("splitview"), "one page on screen again");
+t = await open();
+bar.querySelector(".arc-peek-expand").click(); await wait(800);
+check(!root.hasAttribute("arc-peek") && t.isConnected && gBrowser.selectedTab === t && R(t).h > 0, "Open as Tab keeps it as a normal tab");
+gBrowser.removeTab(t, {animate: false}); await wait(500);
+return result({});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);
