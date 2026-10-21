@@ -346,7 +346,7 @@ sidebar-main {
   /* 8px, the line, 8px: from the row above (+ its half-gap padding) to the
      button. Below it, the tab rows' own half-gap padding, so the button
      keeps the same gap to the next tab as tabs have between them. */
-  margin-block: calc(17px - var(--arc-tab-gap) / 2) calc(var(--arc-tab-gap) / 2) !important;
+  margin-block: calc(17px - var(--arc-tab-gap) / 2 + var(--arc-folder-space, 0px)) calc(var(--arc-tab-gap) / 2) !important;
   translate: 0 var(--arc-newtab-shift, 0px) !important;
 
   &::before {
@@ -407,6 +407,29 @@ sidebar-main {
   display: none !important;
 }
 
+/* A folder being dragged: the script holds its space above + New Tab, so
+   the normal tabs below it stay put without LibreWolf's own offset (which
+   would push them down a second time) */
+:root[arc-folder-drag] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned], [arc-pinned-row]), tab-split-view-wrapper:not(:has(> .tabbrowser-tab[arc-pinned-row]))) {
+  top: 0 !important;
+}
+
+/* ...the tiles make room for it, from the place under the pointer on (the
+   script slides them one cell along, and grows the grid a line if needed),
+   and the rows stay where they are meanwhile ([arc-tab-over-tiles]) */
+:root[arc-dragging] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned]:not([dragtarget]) {
+  transition: translate 150ms ease !important;
+}
+
+:root[arc-dragging] #pinned-tabs-container {
+  padding-block-end: var(--arc-tiles-grow, 0px) !important;
+  transition: padding-block-end 150ms ease !important;
+}
+
+:root[arc-tab-over-tiles] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned], [dragtarget]), .tab-group-label-container, tab-split-view-wrapper) {
+  transform: none !important;
+}
+
 /* A tile dragged out of the grid takes a row's shape, in the row
    column ([arc-drag-over-rows], --arc-row-w and --arc-row-dx from the script) */
 :root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] {
@@ -433,6 +456,11 @@ sidebar-main {
 :root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-label-container {
   display: flex !important;
   width: auto !important;
+}
+
+/* (tiles have no space after the icon; rows do) */
+:root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-icon-image {
+  margin-inline-end: var(--tab-icon-margin-inline-end) !important;
 }
 
 /* ...and the tabs below the pointer make room for it */

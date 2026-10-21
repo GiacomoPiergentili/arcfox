@@ -23,12 +23,14 @@ Nothing queued.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
 - Tiles can't be split (LibreWolf keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
-- Dragging a tab in from another window and a real mouse drag are tested with simulated events only.
+- Dragging a tab in from another window is tested with simulated events only. Real drags were checked by hand-run recordings (`~/.arc-drag`, outside the repo), not in the test suite.
+- A folder folds up while it's dragged (LibreWolf's design); the rows above close up and its space waits above the divider until the drop.
 - LibreWolf's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
 - `restoreRows` still converts rows saved by an early version (when rows were LibreWolf pinned tabs); it doubles as crash recovery, so it stays.
 
 ## Done
 
+- [x] Drag and drop glitches (found with recorded real drags): tile drop position, tiles making room, stray row slot, jumps when the grid shrinks or a folder is dragged, split pairs into/out of the rows, leftover offset after a page drop, preview cards during drags, dragged tile's icon spacing.
 - [x] Split view's sidebar item restyled as one 32px row (segmented-control style, whole pixels, folder line continuous).
 - [x] Split view, every way in: pinned rows can be split (pair in the row's spot, only the row saved), right-click split and its "choose a tab" picker, restored split views, tabs from another window, Cmd+W on a row in a split.
 - [x] Split view by drag and drop (as in Arc): drop a tab on the left or right half of the page.

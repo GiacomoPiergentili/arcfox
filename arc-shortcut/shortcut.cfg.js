@@ -106,6 +106,11 @@ try {
             grid-template-columns: repeat(auto-fit, minmax(var(--tab-pinned-min-width), auto)) !important;
             grid-auto-rows: var(--tab-height-with-margin-padding) !important;
             padding-inline: var(--tab-container-margin-inline-pinned-expanded) !important;
+          }
+          /* a tile sliding into a new line while a tab is dragged over the
+             tiles (LibreWolf fixes this box's height during drags) */
+          :host([arc-tiles-growing]) [part~="scrollbox"] {
+            overflow: visible !important;
           }`;
         pinnedArea.shadowRoot.append(style);
       }
@@ -1054,6 +1059,7 @@ try {
       let startMids = [];
       let slotHeight = 0;
       let folderSlot = 0; // height of a folder being dragged
+      let newTabTop = null; // where + New Tab was when a folder drag started
       let firstSlotTop = null;
       // How far a tab is drawn from its place while dragging: LibreWolf's own
       // offsets (style top + transform) plus [arc-make-room]
@@ -1075,6 +1081,87 @@ try {
       const isOverTiles = (y, r = tilesBox()) => !!r && r.height > 0 && y >= r.top && y <= r.bottom + 4;
       // Would a drop at this height make a pinned row?
       const headsForRow = y => !isOverTiles(y) && dividerY !== null && y < dividerY;
+      // A tab dropped on the tiles becomes a tile there, not at the end
+      // (LibreWolf just pins it): the place under the pointer, in reading
+      // order. The tiles' cells are measured once per drag, as they stand.
+      const stillTiles = () => gBrowser.tabs.filter(t => t.pinned && !t.hasAttribute("dragtarget"));
+      let tileCells = null;
+      const cells = () => {
+        if (!tileCells) {
+          const tiles = stillTiles();
+          tiles.forEach(t => (t.style.translate = ""));
+          tileCells = tiles.map(tile => ({ tile, rect: tile.getBoundingClientRect() }));
+        }
+        return tileCells;
+      };
+      const tileSlot = (x, y) => {
+        const i = cells().findIndex(({ rect: r }) => r.top > y || (r.bottom >= y && r.left + r.width / 2 > x));
+        return i === -1 ? cells().length : i;
+      };
+      // ...and while it's over them, the tiles from that place on slide one
+      // cell along to make room (the grid grows a line if it has to)
+      const tilesContainer = () => gBrowser.tabContainer.pinnedTabsContainer || doc.getElementById("pinned-tabs-container");
+      let tileGap = -1;
+      const openTileGap = index => {
+        if (index === tileGap) {
+          return;
+        }
+        tileGap = index;
+        const all = cells();
+        const box = tilesBox();
+        let grow = 0;
+        all.forEach(({ tile, rect }, i) => {
+          if (i < index) {
+            tile.style.translate = "";
+            return;
+          }
+          let to = all[i + 1]?.rect;
+          if (!to) {
+            // the cell after the last tile: along the line, or the next line
+            const pitchX = all.length > 1 && all[1].rect.top === all[0].rect.top ? all[1].rect.left - all[0].rect.left : rect.width;
+            const fits = rect.right + pitchX <= box.right + 1;
+            to = fits ? { left: rect.left + pitchX, top: rect.top } : { left: all[0].rect.left, top: rect.bottom + 8 };
+            grow = fits ? 0 : rect.height + 8;
+          }
+          tile.style.translate = `${to.left - rect.left}px ${to.top - rect.top}px`;
+        });
+        tilesContainer()?.style.setProperty("--arc-tiles-grow", `${grow}px`);
+        tilesContainer()?.toggleAttribute("arc-tiles-growing", grow > 0);
+      };
+      const closeTileGap = () => {
+        tileGap = -1;
+        if (tileCells) {
+          tileCells.forEach(({ tile }) => (tile.style.translate = ""));
+          tileCells = null;
+          tilesContainer()?.style.removeProperty("--arc-tiles-grow");
+          tilesContainer()?.removeAttribute("arc-tiles-growing");
+        }
+      };
+      // Whatever still moves when a drop lands (the tile grid shrinking, a
+      // folder opening again) glides there instead of jumping
+      const glide = () => {
+        const items = [
+          // (the dropped item too when LibreWolf doesn't animate it into place
+          // itself: a tile becoming a row, a folder)
+          ...gBrowser.tabContainer.querySelectorAll(".tabbrowser-tab:not([pinned]):not([dragtarget]), .tabbrowser-tab[pinned][dragtarget], .tab-group-label-container, tab-split-view-wrapper"),
+          periphery,
+        ].filter(Boolean);
+        const before = new Map(items.map(el => [el, el.getBoundingClientRect().top]));
+        // (before the next frame is drawn; transform, as + New Tab's translate
+        // is fixed in userChrome.css)
+        win.requestAnimationFrame(() => {
+          for (const [el, top] of before) {
+            const dy = top - el.getBoundingClientRect().top;
+            if (el.isConnected && Math.abs(dy) >= 4 && Math.abs(dy) < 400) {
+              el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], {
+                duration: 200,
+                easing: "cubic-bezier(0.2, 0, 0, 1)",
+                composite: "add",
+              });
+            }
+          }
+        });
+      };
       const placeAt = (tab, y, moving) => {
         // before the first top-level item (tab or folder) that started below y
         const below = new Set(startMids.filter(m => m.mid >= y).map(m => itemOf(m.tab)));
@@ -1088,6 +1175,19 @@ try {
       };
       // Place it in the same frame LibreWolf unpins it, so it never shows up
       // at the top first
+      gBrowser.tabContainer.addEventListener("TabPinned", e => {
+        const drop = pendingDrop;
+        if (drop?.tileBefore && drop.moving.includes(e.target)) {
+          // once LibreWolf is done with the drop (it moves the tab itself
+          // after pinning it), still before the next frame
+          const tab = e.target;
+          Promise.resolve().then(() => {
+            if (drop.tileBefore.isConnected && drop.tileBefore.pinned && tab.pinned && drop.tileBefore !== tab) {
+              gBrowser.moveTabBefore(tab, drop.tileBefore);
+            }
+          });
+        }
+      });
       gBrowser.tabContainer.addEventListener("TabUnpinned", e => {
         if (pendingDrop?.wasTile.includes(e.target)) {
           placeAt(e.target, pendingDrop.y, pendingDrop.moving);
@@ -1129,16 +1229,24 @@ try {
         // a folder never leaves the pinned block: its drag ends at the block's end
         const folderLabel = target?.closest(".tab-group-label-container");
         folderSlot = 0;
+        newTabTop = null;
         if (folderLabel) {
           // it's lifted out of the layout while dragged: + New Tab keeps its place
           const cs = win.getComputedStyle(folderLabel);
           folderSlot = folderLabel.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
-          periphery?.style.setProperty("--arc-newtab-shift", `${folderSlot}px`);
+          // LibreWolf folds the folder up while it's dragged: + New Tab and
+          // what's below keep their place (the space is held, see dragover)
           const group = folderLabel.closest("tab-group");
+          newTabTop = periphery?.getBoundingClientRect().top ?? null;
+          dragRoot.setAttribute("arc-folder-drag", "");
           const blockEls = els.filter(el => inBlockEl(el) && (el === folderLabel || !group.contains(el)));
           listEndScreenY = Math.max(...blockEls.map(el => el.getBoundingClientRect().bottom)) + win.mozInnerScreenY;
         }
         dragRoot.setAttribute("arc-dragging", "");
+        // no tab preview card hanging around during the drag
+        try {
+          gBrowser.tabContainer.previewPanel?.forceReset?.();
+        } catch {}
         // the first row's slot: right above the divider gap (the end-of-list
         // box's top margin in userChrome.css), the line in its middle
         const gap = periphery ? parseFloat(win.getComputedStyle(periphery).marginTop) || 0 : 0;
@@ -1163,6 +1271,20 @@ try {
           return;
         }
         const dragged = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+        glide();
+        // A split view: dropped above the line, its pages become pinned rows
+        // (one that has a row already stays as it is); below it, normal tabs
+        if (isSplit(dragged) && gBrowser.splitViews.includes(dragged)) {
+          const toRow = !isOverTiles(e.clientY) && headsForRow(e.clientY);
+          if (!toRow || !hasRow(dragged)) {
+            for (const tab of dragged.tabs) {
+              if (isRow(tab) !== toRow) {
+                setRow(tab, toRow);
+              }
+            }
+          }
+          return;
+        }
         // (not ownerGlobal === win: here win is a cross-compartment wrapper)
         if (!gBrowser.tabs.includes(dragged)) {
           return;
@@ -1170,6 +1292,11 @@ try {
         const moving = dragged.multiselected ? [...gBrowser.selectedTabs] : [dragged];
         const y = e.clientY;
         const limit = dividerY;
+        // over the tiles: the tile it goes before (null: the end)
+        let tileBefore;
+        if (isOverTiles(y) && moving.some(t => !t.pinned)) {
+          tileBefore = cells()[tileSlot(e.clientX, y)]?.tile ?? null;
+        }
         // Mark it right away, as the cue showed (rows sort above + New Tab, so
         // a late mark would make it jump); finishDrop double-checks
         const toRow = headsForRow(y);
@@ -1178,7 +1305,7 @@ try {
             setRow(tab, toRow);
           }
         }
-        const drop = { moving, y, limit, toRow, wasTile: moving.filter(t => t.pinned) };
+        const drop = { moving, y, limit, toRow, wasTile: moving.filter(t => t.pinned), tileBefore };
         pendingDrop = drop;
         win.setTimeout(() => finishDrop(drop), 400);
       }, true);
@@ -1214,6 +1341,22 @@ try {
         if (over) {
           dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - r.left}px`);
         }
+        const draggedItem = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]");
+        // a tab (not a tile) over the tiles: they make room; the rows stay put
+        const tabOverTiles = over && !!draggedItem && !draggedItem.pinned;
+        dragRoot.toggleAttribute("arc-tab-over-tiles", tabOverTiles);
+        if (tabOverTiles) {
+          openTileGap(tileSlot(e.clientX, e.clientY));
+        } else {
+          closeTileGap();
+        }
+        // a folder being dragged: the space it left (its name lifted out,
+        // its tabs folded up) is held, so + New Tab stays where it was
+        if (folderSlot && newTabTop !== null && periphery) {
+          const held = parseFloat(periphery.style.getPropertyValue("--arc-folder-space")) || 0;
+          const drift = newTabTop - (periphery.getBoundingClientRect().top - held);
+          periphery.style.setProperty("--arc-folder-space", `${Math.max(0, drift)}px`);
+        }
         // A tile dragged below the grid lines up with the rows
         const tab = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget][pinned]");
         const ref = unpinned()[0];
@@ -1238,7 +1381,7 @@ try {
         // + New Tab follows the rows: as far as LibreWolf has moved the last
         // one, and a slot down while the dragged tab is headed for them
         const rows = movables().filter(el => inBlockEl(el) && !el.hasAttribute("dragtarget"));
-        const shift = Math.max(rows.length ? shiftOf(rows.at(-1)) : 0, toRow ? slotHeight : 0, folderSlot);
+        const shift = folderSlot || tabOverTiles ? 0 : Math.max(rows.length ? shiftOf(rows.at(-1)) : 0, toRow ? slotHeight : 0);
         periphery?.style.setProperty("--arc-newtab-shift", `${shift}px`);
         // With no rows yet, the tab snaps into the first row's slot (where
         // + New Tab was), the line and + New Tab moving down below it
@@ -1252,7 +1395,13 @@ try {
           dragRoot.style.removeProperty("--arc-snap-dy");
         }
       }, true);
+      let quietPreviewsUntil = 0;
       const endDrag = () => {
+        quietPreviewsUntil = win.performance.now() + 1000;
+        closeTileGap();
+        dragRoot.removeAttribute("arc-tab-over-tiles");
+        periphery?.style.removeProperty("--arc-folder-space");
+        dragRoot.removeAttribute("arc-folder-drag");
         dragRoot.removeAttribute("arc-drag-over-tiles");
         dragRoot.removeAttribute("arc-drag-over-rows");
         dragRoot.removeAttribute("arc-drop-row");
@@ -1269,6 +1418,14 @@ try {
         win.setTimeout(normalize, 450);
       };
       gBrowser.tabContainer.addEventListener("dragend", endDrag, true);
+      // Tab preview cards: none while dragging, nor right after a drop (the
+      // pointer comes to rest on a tab)
+      const previews = gBrowser.tabContainer.previewPanel;
+      if (previews?.shouldActivate) {
+        const shouldActivate = previews.shouldActivate.bind(previews);
+        previews.shouldActivate = () =>
+          !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && shouldActivate();
+      }
       gBrowser.tabContainer.addEventListener("drop", endDrag, true);
       gBrowser.tabContainer.addEventListener("dragleave", e => {
         if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
@@ -1412,6 +1569,12 @@ try {
           if (canSplit(dragged) && canSplit(partner) && dragged !== partner) {
             gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
             gBrowser.selectedTab = dragged;
+            // LibreWolf clears the offset a dragged tab follows the pointer
+            // with only from tabs outside split views
+            const tabs = [dragged, partner];
+            const clear = () => tabs.forEach(t => t.style.removeProperty("transform"));
+            win.addEventListener("dragend", () => win.setTimeout(clear, 0), { once: true, capture: true });
+            win.setTimeout(clear, 600);
           }
         } catch (err) {
           console.error("Arc sidebar (split view):", err);
