@@ -1318,3 +1318,61 @@ panel toolbarseparator {
     }
   }
 }
+
+/* ---------- Script check ----------
+   The shortcut script marks every window it runs in ([arc-script]). Without
+   it (typically after a LibreWolf update, which replaces the app and the
+   script with it), a quiet notice says how to put it back. It waits a few
+   seconds, so it never flashes while the script is still starting. */
+@keyframes arc-notice-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+:root:not([arc-script]) #vertical-tabs {
+  position: relative !important;
+}
+
+/* at the bottom of the tab list, above the sidebar's bottom buttons */
+:root:not([arc-script]) #vertical-tabs::after {
+  content: "The Arc script isn't running. Run arc-shortcut/install.sh, then restart LibreWolf.";
+  position: absolute;
+  inset-inline: var(--arc-sidebar-inset);
+  bottom: 8px;
+  z-index: 1;
+  padding: 8px 10px;
+  border-radius: var(--arc-radius-inner);
+  background: var(--arc-field);
+  color: var(--arc-label-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  animation: arc-notice-in 300ms ease-out 5s both;
+}
+
+/* ---------- Confirmation ("Link Copied") ----------
+   A small pill over the bottom of the page (#arc-toast, placed by the
+   script), fading and growing in like a macOS HUD */
+#arc-toast {
+  position: fixed;
+  z-index: 1000;
+  translate: -50% -100%;
+  padding: 6px 14px;
+  border-radius: var(--arc-radius);
+  background: var(--arc-panel);
+  box-shadow: var(--arc-shadow-3);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.96;
+  transition: opacity var(--arc-close-duration) var(--arc-ease-close),
+              scale var(--arc-close-duration) var(--arc-ease-close);
+
+  &[shown] {
+    opacity: 1;
+    scale: 1;
+    transition-duration: var(--arc-pop-duration);
+    transition-timing-function: var(--arc-ease-open);
+  }
+}

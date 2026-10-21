@@ -11,6 +11,7 @@
 // on the empty page does nothing.
 // Pinned rows and tiles remember their pinned page (dot while away).
 // Selected tiles take their icon's colors (as in Zen).
+// Cmd+Shift+C copies the page's address; Cmd+1…9 go to the tiles, then the rows.
 try {
   (() => {
     const Cc = Components.classes;
@@ -33,6 +34,9 @@ try {
 
     obs.addObserver(win => {
       const doc = win.document;
+      // Marks the window as running this script: userChrome.css shows a
+      // notice when it's missing (e.g. after a LibreWolf update replaced it)
+      doc.documentElement.setAttribute("arc-script", "");
       // Reuse the existing Cmd+S key: detach it from "Save Page" and run our toggle instead
       const key = doc.getElementById("key_savePage");
       if (!key) {
@@ -578,6 +582,75 @@ try {
           e.preventDefault();
           e.stopPropagation();
           run(e.shiftKey ? toggleTile : toggleRow, "keydown");
+        }
+      }, true);
+
+      // A short confirmation over the page, e.g. "Link Copied" (styled in
+      // userChrome.css as #arc-toast)
+      let toast = null;
+      let toastTimer = null;
+      const showToast = text => {
+        if (!toast) {
+          toast = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+          toast.id = "arc-toast";
+          toast.setAttribute("role", "status");
+          doc.body.append(toast);
+        }
+        const page = doc.getElementById("tabbrowser-tabbox")?.getBoundingClientRect();
+        if (page) {
+          toast.style.left = `${page.left + page.width / 2}px`;
+          toast.style.top = `${page.bottom - 24}px`;
+        }
+        toast.textContent = text;
+        toast.toggleAttribute("shown", false);
+        toast.getBoundingClientRect(); // restart the animation
+        toast.toggleAttribute("shown", true);
+        win.clearTimeout(toastTimer);
+        toastTimer = win.setTimeout(() => toast.toggleAttribute("shown", false), 1500);
+      };
+
+      // Cmd+Shift+C copies the page's address (as in Arc). It was the
+      // developer tools' element picker (Cmd+Option+C still opens them).
+      const copyAddress = () => {
+        const url = gBrowser.selectedBrowser.currentURI?.spec;
+        if (!url || win.isBlankPageURL(url) || gBrowser.selectedTab.hasAttribute("arc-start-page")) {
+          return;
+        }
+        Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString(url);
+        showToast("Link Copied");
+      };
+      doc.getElementById("key_inspectorMac")?.setAttribute("disabled", "true");
+
+      // Cmd+1…9 go to the tiles in order, then on to the pinned rows (a
+      // collapsed folder's rows don't count). LibreWolf's own (the 1st to 8th
+      // tab, the last tab) counted every tab, rows and folders in between.
+      const pinnedInOrder = () => [
+        ...gBrowser.tabs.filter(t => t.pinned),
+        ...gBrowser.tabs.filter(t => !t.pinned && isRow(t) && !t.group?.collapsed),
+      ];
+      for (const id of ["key_selectTab1", "key_selectTab2", "key_selectTab3", "key_selectTab4", "key_selectTab5",
+                        "key_selectTab6", "key_selectTab7", "key_selectTab8", "key_selectLastTab"]) {
+        doc.getElementById(id)?.setAttribute("disabled", "true");
+      }
+
+      win.addEventListener("keydown", e => {
+        if (!e.metaKey || e.ctrlKey || e.altKey) {
+          return;
+        }
+        if (e.code === "KeyC" && e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          copyAddress();
+          return;
+        }
+        const n = /^Digit([1-9])$/.exec(e.code)?.[1];
+        if (n && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          const tab = pinnedInOrder()[n - 1];
+          if (tab) {
+            gBrowser.selectedTab = tab;
+          }
         }
       }, true);
 

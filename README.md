@@ -52,6 +52,8 @@ Built and tested on **LibreWolf 158** (macOS, dark mode).
 | Cmd+D | Make the current tab a pinned row, or a normal tab again (was Bookmark Page) |
 | Cmd+Shift+D | Make the current tab a tile, or not (was Bookmark All Tabs) |
 | Cmd+W | On a row or tile: reset it to its pinned page. On a normal tab: close it |
+| Cmd+Shift+C | Copy the page's address ("Link Copied"); was the developer tools' element picker (Cmd+Option+C still opens them) |
+| Cmd+1…9 | Go to the tiles in order, then on to the pinned rows |
 | Esc | Close the command bar |
 
 ## Install
@@ -69,7 +71,7 @@ Built and tested on **LibreWolf 158** (macOS, dark mode).
    ```
 4. Quit LibreWolf (Cmd+Q) and reopen it.
 
-**After every LibreWolf update, run `install.sh` again**: updates replace the app, including the config file the script lives in (the CSS keeps working without it, the behavior doesn't).
+**After every LibreWolf update, run `install.sh` again**: updates replace the app, including the config file the script lives in (the CSS keeps working without it, the behavior doesn't). When the script isn't running, a notice at the bottom of the sidebar says so.
 
 To remove the script: `install.sh uninstall`, then restart. To remove the look: delete or rename `userChrome.css`.
 
@@ -98,5 +100,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 6. **Tile colors** (Zen-style), tile hover, icons kept while loading, quiet sound badges.
 7. **Spacing audit**: everything on whole pixels and one rhythm; later a "roomier" density (32px rows, 40px tiles) with all spacings derived from two gap tokens.
 8. **Full audit**: dead code and stale comments removed, dialog panels restyled as popovers, and bugs fixed: folders lost at every launch, a 2px drag offset, a black tile after Cmd+W (a stale "visually selected" state), tiles turning into rows in auto-hide mode.
+
+9. **Update safety and shortcuts**: a sidebar notice when the script isn't running (after a LibreWolf update); Cmd+Shift+C copies the page address with a "Link Copied" confirmation; Cmd+1…9 go to the tiles, then the pinned rows.
 
 Plans and known gaps: see [TODO.md](TODO.md).
