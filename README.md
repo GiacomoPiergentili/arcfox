@@ -31,6 +31,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - **Pinned rows** (Cmd+D): normal tabs kept above the divider; saved and reopened (unloaded) at every launch.
 - **Folders**: LibreWolf's tab groups, kept in the pinned block, styled like Arc's.
 - Arc-style drag and drop between tiles, rows, folders and normal tabs, with live cues.
+- **Every window shows the same tiles, rows and folders**, kept in sync: pin, reorder, rename or remove in one window and the others follow (each window has its own copy of the pages, unloaded until opened). Private windows keep to themselves.
 - **Pinned page**: each row and tile remembers the page it was pinned on. A dot shows when it's somewhere else; clicking the dot (or Cmd+W, or the right-click menu) goes back. One-time bot-check addresses (Reddit, Cloudflare) are ignored.
 - **Tile colors** (as in Zen): the selected tile takes its icon's colors, as a soft gradient with a hairline in the main color.
 - Tiles keep their icon while loading, show sound badges as a quiet corner icon, and have no close button.
@@ -95,7 +96,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `librewolf.cfg` and the pref file below. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Disables the autoconfig sandbox so the script can reach browser windows. |
 
-The script keeps its state in prefs and session data: pinned rows and folders in the pref `arc.pinnedRows`, the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
+The script keeps its state in prefs and session data: tiles in the pref `arc.tiles` and pinned rows and folders in `arc.pinnedRows` (the shared list every window follows; each item has an id, `arc-id` on its tabs), the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
 
 Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
 
@@ -105,7 +106,7 @@ Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`:
 python3 tests/run_tests.py
 ```
 
-Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, rows and folders across a restart, and auto-archive. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
+Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
 
 ## What's been done
 
@@ -128,6 +129,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 12. **Screenshots and license**: README screenshots (dark, light, command bar, auto-hide); MIT license.
 13. **Auto-hide sidebar color**: measured from the pinned sidebar on theme, appearance and wallpaper changes (`arc.sidebarColor.dark` / `.light`).
 14. **Video fullscreen, accessibility, tests**: videos fill the screen; the custom buttons have VoiceOver names; a regression test suite, which right away caught fresh installs fitting only 2 tiles per row (the sidebar's contents were narrower than the sidebar until its edge was dragged once).
+15. **Multiple windows**: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

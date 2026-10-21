@@ -4,7 +4,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Multiple windows**: other windows don't show your tiles, pinned rows and folders (tiles are per-window LibreWolf pinned tabs; rows are restored only in the first window). In Arc every window shows the same ones.
+Nothing queued.
 
 ## Later
 
@@ -18,6 +18,7 @@ Nothing queued.
 ## Known limitations
 
 - The auto-hide sidebar is one flat color; themes that shade the pinned sidebar from edge to edge (Nova Ash does, slightly) match it in the middle, within a shade. With the sidebar kept on auto-hide, a wallpaper change is picked up the next time it's pinned (Cmd+S).
+- Multiple windows: if two windows change the sidebar within the same half second, the later save wins. Whether a folder is open or closed stays per window. A change of a tile's icon alone reaches other windows with the next other change.
 - The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
@@ -25,6 +26,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Multiple windows: every window shows the same tiles, rows and folders, kept in sync (as in Arc).
 - [x] Test suite (`python3 tests/run_tests.py`). It found fresh installs fitting only 2 tiles per row: fixed (the sidebar's contents now always fill it).
 - [x] Video fullscreen fills the screen (no page-card gutter, corners or shadow).
 - [x] Accessibility: the sidebar button and the pinned-page dot have proper names for VoiceOver.

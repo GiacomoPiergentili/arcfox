@@ -296,6 +296,48 @@ check(r0.isConnected, "a pinned row is never archived");
 Services.prefs.clearUserPref("arc.archiveAfterHours");
 return result({});
 """),
+
+    ("multiple windows: the same sidebar, kept in sync", r"""
+const openWindow = async opts => {
+  const w = OpenBrowserWindow(opts);
+  await new Promise(k => Services.obs.addObserver(function o(s) { if (s === w) { Services.obs.removeObserver(o, "browser-delayed-startup-finished"); k(); } }, "browser-delayed-startup-finished"));
+  await wait(3000);
+  return w;
+};
+const labels = (g, kind) => g.gBrowser.tabs.filter(t => kind === "tile" ? t.pinned : !t.pinned && t.hasAttribute("arc-pinned-row")).map(t => t.label);
+const folderOf = g => g.gBrowser.tabGroups[0];
+const w2 = await openWindow();
+const g2 = w2;
+check(JSON.stringify(labels(g2, "tile")) === JSON.stringify(labels(window, "tile")), "window 2 has the same tiles: " + labels(g2, "tile").join(", "));
+check(JSON.stringify(labels(g2, "row")) === JSON.stringify(labels(window, "row")), "window 2 has the same rows: " + labels(g2, "row").join(", "));
+check(folderOf(g2)?.label === folderOf(window)?.label && folderOf(g2)?.tabs.length === folderOf(window)?.tabs.length, "window 2 has the same folder");
+check(g2.gBrowser.tabs.filter(t => t.pinned || t.hasAttribute("arc-pinned-row")).every(t => t.hasAttribute("pending")), "its copies are unloaded");
+// a new row in window 1
+const t = gBrowser.addTab(page("Row New"), {triggeringPrincipal: P});
+gBrowser.selectedTab = t; await wait(500);
+document.getElementById("addBookmarkAsKb").doCommand(); await wait(1500);
+check(labels(g2, "row").includes("Row New"), "a new row shows up in window 2");
+// renaming the folder, reordering tiles, a new tile
+folderOf(window).label = "Renamed"; await wait(1500);
+check(folderOf(g2)?.label === "Renamed", "renaming a folder carries over: " + folderOf(g2)?.label);
+const tl = tiles();
+gBrowser.moveTabBefore(tl[2], tl[0]); await wait(1500);
+check(JSON.stringify(labels(g2, "tile")) === JSON.stringify(labels(window, "tile")), "reordering tiles carries over: " + labels(g2, "tile").join(", "));
+const nt = gBrowser.addTab(page("Tile New", "#fa0"), {triggeringPrincipal: P}); await wait(500);
+gBrowser.pinTab(nt); await wait(1500);
+check(labels(g2, "tile").includes("Tile New"), "a new tile shows up in window 2");
+// un-pinning a row in window 2 removes it in window 1
+const r2 = g2.gBrowser.tabs.find(x => x.label === "Row New");
+g2.gBrowser.selectedTab = r2; await wait(500);
+g2.document.getElementById("addBookmarkAsKb").doCommand(); await wait(1500);
+check(!labels(window, "row").includes("Row New"), "a row removed in window 2 goes in window 1 too");
+w2.close(); await wait(800);
+// a private window stays empty
+const pw = await openWindow({private: true});
+check(pw.gBrowser.tabs.filter(x => x.pinned || x.hasAttribute("arc-pinned-row")).length === 0, "a private window has no tiles or rows");
+pw.close(); await wait(500);
+return result({});
+"""),
 ]
 
 
