@@ -98,6 +98,31 @@ try {
       doc.documentElement.setAttribute("arc-script", "");
       // (a window is open: LibreWolf is far enough along for this)
       win.setTimeout(hookAltPeek, 0);
+      // A profile's first run with this setup (a new profile, made with the
+      // switcher's + or not): the settings the layout relies on, once; what
+      // you change later stays. (The look's own three settings are written
+      // into a new profile before its first start, see the profile switcher.)
+      if (!prefs.getBoolPref("arc.profileDefaultsApplied", false)) {
+        const setIfDefault = (name, value) => {
+          try {
+            if (prefs.prefHasUserValue(name)) {
+              return;
+            }
+            if (typeof value === "boolean") {
+              prefs.setBoolPref(name, value);
+            } else {
+              prefs.setStringPref(name, value);
+            }
+          } catch {}
+        };
+        setIfDefault("browser.toolbars.bookmarks.visibility", "never"); // no room for it in the sidebar
+        setIfDefault("browser.startup.homepage", "chrome://browser/content/blanktab.html"); // launch: the empty page with the command bar
+        setIfDefault("browser.newtabpage.enabled", false);
+        setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
+        setIfDefault("sidebar.new-sidebar.has-used", true);
+        setIfDefault("sidebar.main.tools", "bookmarks,history"); // the bottom row's left buttons
+        prefs.setBoolPref("arc.profileDefaultsApplied", true);
+      }
       // Reuse the existing Cmd+S key: detach it from "Save Page" and run our toggle instead
       const key = doc.getElementById("key_savePage");
       if (!key) {

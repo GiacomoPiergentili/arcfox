@@ -31,6 +31,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
 - **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one ringed; hover for the name), as many as fit. Click one to bring its window forward (or start it).
 - **+** creates a profile already set up for this look (its `chrome` folder linked to this one, the settings it needs) and opens it on LibreWolf's page to name it and pick an avatar and color.
+- Any profile's first run with the script gives it, once, the settings the layout relies on (no bookmarks toolbar, a blank start page, no new tab page content, Bookmarks and History in the bottom row); what you change afterwards stays.
 
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
 - **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).

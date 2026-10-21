@@ -1776,6 +1776,12 @@ split-view-footer {
   transition: none;
 }
 
+/* No bookmarks toolbar: there's no room for it in the sidebar (bookmarks
+   are in the bottom row's Bookmarks button and the menu bar) */
+#PersonalToolbar {
+  display: none !important;
+}
+
 /* ---------- Profile switcher ----------
    In the middle of the sidebar's bottom row, between Bookmarks / History
    and Downloads / Extensions (#arc-profiles, from the shortcut script): the

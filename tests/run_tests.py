@@ -133,6 +133,8 @@ return result({tabs: gBrowser.tabs.map(t => (t.pinned ? "tile:" : isRow(t) ? "ro
 TESTS = [
     ("script is installed and running", r"""
 check(root.hasAttribute("arc-script"), "the window isn't marked [arc-script]: run arc-shortcut/install.sh");
+check(Services.prefs.getBoolPref("arc.profileDefaultsApplied", false), "a new profile gets the settings the layout relies on");
+check(Services.prefs.getStringPref("browser.toolbars.bookmarks.visibility", "") === "never" && Services.prefs.getStringPref("sidebar.main.tools", "") === "bookmarks,history", "...bookmarks toolbar off, Bookmarks and History in the bottom row");
 return result({});
 """),
 

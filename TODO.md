@@ -31,6 +31,7 @@ Nothing queued.
 
 ## Done
 
+- [x] New profiles: the settings the layout relies on are applied once on a profile's first run (a new profile showed the bookmarks toolbar in the sidebar, no launch command bar, no Bookmarks button).
 - [x] Spaces, as LibreWolf profiles: a profile switcher in the sidebar's bottom row; + creates a profile set up for this look.
 - [x] Start-up: tiles load when opened; the tab list fades in complete instead of popping in (no stray "New Tab" row, blank tiles or late icons).
 - [x] Peek motion: the card grows out of the clicked link once its page has drawn and shrinks back on close; no black frames (the page underneath is kept drawn), no empty card.
