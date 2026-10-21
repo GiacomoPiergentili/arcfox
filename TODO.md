@@ -14,6 +14,7 @@ Nothing queued.
 
 - [ ] **Spaces**: several sidebars (e.g. work / personal) to switch between, as in Arc.
 - [ ] **Peek**: links opened from a tile show in a floating preview window instead of replacing the tile's page.
+- [ ] **Split view by drag and drop**: drag a tab onto another to see both side by side. LibreWolf 158 has a built-in split view to build on (it needs a gesture and the Arc/Apple styling). To decide: since dropping onto a tab already means "reorder", the gesture could be dropping onto the left or right side of the page (as in Arc) or holding the tab over another one for a moment.
 
 ## Known limitations
 
