@@ -23,7 +23,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Toolbar and URL bar on top of the sidebar; the page is a floating card with an 8px gutter on every side.
 - Window buttons, then a **sidebar button** (show / auto-hide, same as Cmd+S); back, forward, reload at the right.
 - Bottom row: Bookmarks, History, Downloads, Extensions. No ☰ menu (everything in it is in the macOS menu bar) and no "Customize sidebar" gear.
-- **Auto-hide mode**: the sidebar slides in over the page when the pointer reaches the window's left edge (Apple-style curves); the URL bar then floats in the middle of the window, Spotlight-style.
+- **Auto-hide mode**: the sidebar slides in over the page when the pointer reaches the window's left edge (Apple-style curves); the URL bar then floats in the middle of the window, Spotlight-style. Its color is measured from the pinned sidebar, so it matches with any theme or wallpaper.
 - Fullscreen: the sidebar and toolbar keep working when the macOS menu bar slides in.
 
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
@@ -95,7 +95,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `librewolf.cfg` and the pref file below. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Disables the autoconfig sandbox so the script can reach browser windows. |
 
-The script keeps its state in prefs and session data: pinned rows and folders in the pref `arc.pinnedRows`, the auto-archive time in `arc.archiveAfterHours`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
+The script keeps its state in prefs and session data: pinned rows and folders in the pref `arc.pinnedRows`, the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
 
 Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
 
@@ -118,6 +118,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 11. **Light mode pass**: the auto-hide sidebar now matches the pinned one in light mode too (its light color was a guess); + New Tab uses the rows' text color in every theme.
 
 12. **Screenshots and license**: README screenshots (dark, light, command bar, auto-hide); MIT license.
+13. **Auto-hide sidebar color**: measured from the pinned sidebar on theme, appearance and wallpaper changes (`arc.sidebarColor.dark` / `.light`).
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

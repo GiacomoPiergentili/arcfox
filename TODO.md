@@ -4,7 +4,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Theme-independent sidebar color**: the auto-hide sidebar's color is measured from the pinned one (macOS's own window background, which CSS can't read). It matches with Nova Ash; with another theme, or a wallpaper that tints windows differently, it can be slightly off.
+Nothing queued: pick from "Later" or "Bigger projects".
 
 ## Later
 
@@ -17,6 +17,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Known limitations
 
+- The auto-hide sidebar is one flat color; themes that shade the pinned sidebar from edge to edge (Nova Ash does, slightly) match it in the middle, within a shade. With the sidebar kept on auto-hide, a wallpaper change is picked up the next time it's pinned (Cmd+S).
 - The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
@@ -24,6 +25,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Done
 
+- [x] The auto-hide sidebar measures the pinned sidebar's color itself (at launch, on theme and light/dark changes, when the window becomes active, when the sidebar gets pinned), so it matches with any theme or wallpaper.
 - [x] Fixed: a quick Cmd+T right after Enter was ignored, and the bar could fill with the previous tab's address while it loaded.
 - [x] README screenshots (dark, light, command bar, auto-hide) and an MIT license.
 - [x] Light mode pass (Nova Ash): auto-hide sidebar color fixed for light mode; + New Tab text in the rows' color.

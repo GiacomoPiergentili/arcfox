@@ -1188,10 +1188,12 @@ panel toolbarseparator {
 /* Expanded on hover: a floating panel over the page.
    The pinned sidebar shows macOS's own window background, which CSS can't
    reach (no native material can be applied to an element), and LibreWolf
-   paints the floating one near-black. Match it with the colors measured
-   from the pinned sidebar, with the Nova Ash theme, in both appearances. */
+   paints the floating one near-black. The shortcut script measures the
+   pinned sidebar (on theme, appearance and wallpaper changes) into
+   --arc-sidebar-dark / --arc-sidebar-light; until then, the values measured
+   with the Nova Ash theme. */
 :root {
-  --arc-hover-panel-bg: light-dark(rgb(250, 249, 253), rgb(60, 59, 63));
+  --arc-hover-panel-bg: light-dark(var(--arc-sidebar-light, rgb(250, 249, 253)), var(--arc-sidebar-dark, rgb(60, 59, 63)));
 }
 
 :root[sidebar-expand-on-hover] #sidebar-container[sidebar-launcher-expanded],
