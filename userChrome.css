@@ -1751,7 +1751,7 @@ split-view-footer {
 }
 
 /* ---------- Start-up ----------
-   While a window starts, its tab list is hidden ([arc-starting], set by the
+   While a window starts, its tab list (and URL bar) is hidden ([arc-starting], set by the
    shortcut script before the window is shown) until its tiles, rows,
    folders and start page are in place; then it fades in. Without the
    script nothing is hidden. */
@@ -1760,6 +1760,18 @@ split-view-footer {
 }
 
 :root[arc-starting] #tabbrowser-tabs {
+  opacity: 0;
+  transition: none;
+}
+
+/* ...and so is the URL bar in the sidebar (LibreWolf focuses it for the
+   empty start page): on a start page it first appears floating in the
+   middle ([arc-newtab-bar]), never in the sidebar first */
+#urlbar-container {
+  transition: opacity 150ms ease-out;
+}
+
+:root[arc-starting]:not([arc-newtab-bar]) #urlbar-container {
   opacity: 0;
   transition: none;
 }

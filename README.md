@@ -25,7 +25,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Bottom row: Bookmarks, History, Downloads, Extensions. No ☰ menu (everything in it is in the macOS menu bar) and no "Customize sidebar" gear.
 - **Auto-hide mode**: the sidebar slides in over the page when the pointer reaches the window's left edge (Apple-style curves); the URL bar then floats in the middle of the window, Spotlight-style. Its color is measured from the pinned sidebar, so it matches with any theme or wallpaper.
 - Fullscreen: the sidebar and toolbar keep working when the macOS menu bar slides in.
-- Start-up: the tab list appears complete (tiles, rows, folders, icons) with a short fade, instead of popping in piece by piece.
+- Start-up: the tab list appears complete (tiles, rows, folders, icons) with a short fade, instead of popping in piece by piece; the command bar appears straight in the middle (never in the sidebar first).
 
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
 - **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
