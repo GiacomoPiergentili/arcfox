@@ -40,6 +40,62 @@ try {
     // tile's page at launch made start-up slow and busy (and left the tiles
     // blank while they loaded)
     defaults.setBoolPref("browser.sessionstore.restore_pinned_tabs_on_demand", true);
+    // No LibreWolf tool buttons (Bookmarks, History...) in the sidebar's
+    // bottom row: it has Downloads, the profiles and Extensions. Taken out
+    // of the list before the first window is drawn, so they're never made
+    // (hiding them from the window's own set-up let them flash at launch).
+    // Extensions' sidebar buttons (ids with @ or {) stay listed. (And a new
+    // profile doesn't get LibreWolf's starter set of them: that's for
+    // profiles that haven't "used the new sidebar" yet.)
+    defaults.setBoolPref("sidebar.new-sidebar.has-used", true);
+    try {
+      const userPrefs = Cc["@mozilla.org/preferences-service;1"]
+        .getService(Ci.nsIPrefService)
+        .getBranch("");
+      const tools = userPrefs.getStringPref("sidebar.main.tools", "");
+      const kept = tools.split(",").filter(t => /[@{]/.test(t)).join(",");
+      if (kept !== tools) {
+        userPrefs.setStringPref("sidebar.main.tools", kept);
+      }
+    } catch (e) {}
+
+    // No "Customize sidebar" gear or LibreWolf tool buttons in the sidebar's
+    // bottom row (they live in the sidebar's shadow DOM, which userChrome.css
+    // can't reach). Its settings stay in Settings > General > Browser layout.
+    // Without the gear LibreWolf shows a "More tools" button, with nothing to
+    // show in it. Done before the window is first shown (doing it in the
+    // window's own set-up, after it's drawn, let the gear flash at launch).
+    // Any tool button that still turns up (an extension's) is invisible but
+    // keeps the row's height, so the tab list stops above the row.
+    const styleSidebarMain = doc => {
+      const sidebarMain = doc.querySelector("sidebar-main");
+      if (!sidebarMain) {
+        return;
+      }
+      const add = () => {
+        const root = sidebarMain.shadowRoot;
+        if (!root || root.getElementById("arc-sidebar-main-style")) {
+          return !!root;
+        }
+        const style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
+        style.id = "arc-sidebar-main-style";
+        style.textContent = `
+          moz-button[view="viewCustomizeSidebar"], .more-tools-button { display: none !important; }
+          .tools-and-extensions moz-button { visibility: hidden !important; }
+          .tools-and-extensions { gap: 4px !important; padding-inline-start: 9px !important; }
+          .tools-and-extensions moz-button {
+            --button-size-icon: 30px !important; /* LibreWolf sizes them from the tab height */
+            --button-border-radius: var(--arc-radius-inner) !important;
+            --button-background-color-ghost-hover: var(--arc-fill-hover) !important;
+            --button-background-color-ghost-active: var(--arc-fill-selected) !important;
+          }`;
+        root.append(style);
+        return true;
+      };
+      if (!add()) {
+        doc.defaultView.customElements.whenDefined("sidebar-main").then(add);
+      }
+    };
 
     // A starting window's tab list stays hidden ([arc-starting]) until its
     // tiles, rows, folders and start page are in place, then fades in:
@@ -51,6 +107,7 @@ try {
         if (win.toolbar?.visible === false) {
           return;
         }
+        styleSidebarMain(win.document);
         const root = win.document.documentElement;
         root.setAttribute("arc-starting", "");
         win.setTimeout(() => root.removeAttribute("arc-starting"), 4000);
@@ -183,31 +240,9 @@ try {
         buttonbox.after(sidebarButton);
       }
 
-      // No "Customize sidebar" gear in the sidebar's bottom row (it lives in
-      // the sidebar's shadow DOM, which userChrome.css can't reach). Its
-      // settings stay in Settings > General > Browser layout. Without it
-      // LibreWolf shows a "More tools" button, with nothing to show in it.
-      const sidebarMain = doc.querySelector("sidebar-main");
-      if (sidebarMain) {
-        win.customElements.whenDefined("sidebar-main").then(() => sidebarMain.updateComplete).then(() => {
-          const style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
-          // LibreWolf's tool buttons (Bookmarks, History...) aren't shown: the
-          // bottom row has Downloads, the profile switcher and Extensions.
-          // They keep their row's height (so the tab list stops above it), and
-          // the style of every other icon button should one come back.
-          style.textContent = `
-            moz-button[view="viewCustomizeSidebar"], .more-tools-button { display: none !important; }
-            .tools-and-extensions moz-button { visibility: hidden !important; }
-            .tools-and-extensions { gap: 4px !important; padding-inline-start: 9px !important; }
-            .tools-and-extensions moz-button {
-              --button-size-icon: 30px !important; /* LibreWolf sizes them from the tab height */
-              --button-border-radius: var(--arc-radius-inner) !important;
-              --button-background-color-ghost-hover: var(--arc-fill-hover) !important;
-              --button-background-color-ghost-active: var(--arc-fill-selected) !important;
-            }`;
-          sidebarMain.shadowRoot?.append(style);
-        });
-      }
+      // (the sidebar's bottom row: see styleSidebarMain above; normally done
+      // before the window was shown)
+      styleSidebarMain(doc);
 
       // Tiles stay a grid with the sidebar on auto-hide too (LibreWolf turns
       // them into a list there): the grid lives inside the pinned area's

@@ -781,10 +781,16 @@ sidebar-main {
 }
 
 /* Downloads at the left end (its icon in line with the tab icons),
-   Extensions at the right, the profile switcher between them */
+   Extensions at the right, the profile switcher between them. LibreWolf
+   builds Downloads hidden and shows it only after the window is up (it
+   never auto-hides it), so it popped in late at launch: always shown. */
 #downloads-button {
   left: 13px !important;
   right: auto !important;
+
+  &[hidden] {
+    display: flex !important;
+  }
 }
 
 :is(#downloads-button, #unified-extensions-button) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
@@ -804,8 +810,9 @@ sidebar-main {
    the shortcut script): 30px squares 34px apart, with the tab rows' corners
    and hover / pressed fills */
 #navigator-toolbox {
-  --toolbarbutton-hover-background: var(--arc-fill-hover) !important;
-  --toolbarbutton-active-background: var(--arc-fill-selected) !important;
+  /* (LibreWolf 158's names; it tints them with the accent otherwise) */
+  --toolbarbutton-background-color-hover: var(--arc-fill-hover) !important;
+  --toolbarbutton-background-color-active: var(--arc-fill-selected) !important;
 }
 
 #nav-bar :is(#arc-sidebar-button, #back-button, #forward-button, #reload-button, #stop-button) {

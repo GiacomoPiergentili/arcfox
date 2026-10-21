@@ -372,6 +372,12 @@ check(dl.x - sb.x < 20 && sb.r - ext.r < 20, "Downloads at the left end, Extensi
 check(b[0].x > dl.r && b.at(-1).r < ext.x, "between them, clear of both");
 const tools = [...(document.querySelector("sidebar-main").shadowRoot?.querySelectorAll(".tools-and-extensions moz-button") || [])];
 check(tools.every(t => getComputedStyle(t).visibility === "hidden"), "LibreWolf's tool buttons (Bookmarks, History) aren't shown: " + tools.length);
+check(!/(^|,)(bookmarks|history|syncedtabs|aichat)(,|$)/.test(Services.prefs.getStringPref("sidebar.main.tools", "")), "...and aren't even made (they flashed at launch): " + Services.prefs.getStringPref("sidebar.main.tools", ""));
+check(!document.getElementById("downloads-button").hidden || getComputedStyle(document.getElementById("downloads-button")).display !== "none", "Downloads is shown from the start");
+InspectorUtils.addPseudoClassLock(document.getElementById("downloads-button"), ":hover"); await wait(300);
+const dlFill = getComputedStyle(document.querySelector("#downloads-button .toolbarbutton-badge-stack")).backgroundColor;
+check(/^rgba\((0, 0, 0, 0\.04|255, 255, 255, 0\.06)\)$/.test(dlFill), "icon buttons hover with the tab rows' soft grey: " + dlFill);
+InspectorUtils.clearPseudoClassLocks(document.getElementById("downloads-button"));
 const avatar = box.querySelector(".arc-profile:not([current])");
 InspectorUtils.addPseudoClassLock(avatar, ":hover"); await wait(300);
 const hov = getComputedStyle(avatar);
