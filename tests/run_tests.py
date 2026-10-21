@@ -315,6 +315,11 @@ return result({});
 
     ("Peek: links from a tile open in a card", r"""
 const tile = tiles()[0];
+const { BrowserUtils } = ChromeUtils.importESModule("resource://gre/modules/BrowserUtils.sys.mjs");
+const pageClick = mods => ({href: "https://example.org/", referrerInfo: "", button: 0, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, ...mods});
+check(/^tab/.test(BrowserUtils.whereToOpenLink(pageClick({altKey: true}))), "Option+click on a link in a page opens it in front (as a Peek)");
+check(BrowserUtils.whereToOpenLink(pageClick({})) === "current", "a plain click stays in the page");
+check(BrowserUtils.whereToOpenLink({altKey: true, button: 0}) === "current", "Option elsewhere (menus, bookmarks) keeps its meaning");
 check(tile.linkedBrowser.browsingContext.isAppTab, "a tile opens other sites' links elsewhere");
 check(rows().every(r => !r.linkedBrowser?.browsingContext || r.linkedBrowser.browsingContext.isAppTab), "so do pinned rows");
 const open = async () => {

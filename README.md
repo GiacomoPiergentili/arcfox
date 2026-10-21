@@ -51,7 +51,8 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 
 ### Peek (as in Arc)
 - A link to another site clicked in a tile or a pinned row opens in a card floating over the pinned page (dimmed), instead of replacing it. Links within the same site navigate as usual.
-- The card has buttons above its top-right corner: **Open as Tab** (keep it as a normal tab), **Open in Split View** (from a pinned row: side by side with it) and **Close**.
+- **Option+click** any link, in any tab, to open it in Peek (as in Zen).
+- The card has buttons above its top-right corner: **Open as Tab** (keep it as a normal tab), **Open in Split View** (side by side with the page underneath; not from a tile) and **Close**.
 - Esc, a click on the dimmed page, Cmd+W or switching to another tab closes it; the page is then gone (it's in Recently Closed).
 
 ### Closing
@@ -79,6 +80,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 | Cmd+W | On a row or tile: reset it to its pinned page. On a normal tab: close it |
 | Cmd+Shift+C | Copy the page's address ("Link Copied"); was the developer tools' element picker (Cmd+Option+C still opens them) |
 | Cmd+1…9 | Go to the tiles in order, then on to the pinned rows |
+| Option+click a link | Open it in Peek |
 | Esc | Close the command bar, or a Peek |
 
 ## Install

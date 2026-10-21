@@ -34,6 +34,29 @@ try {
     const ARCHIVE_PREF = "arc.archiveAfterHours";
     defaults.setIntPref(ARCHIVE_PREF, 24);
 
+    // Option+click on a link in a page opens it in Peek, from any tab (as in
+    // Zen). LibreWolf does nothing with it otherwise (no navigation, no
+    // download): where a clicked link opens is decided here, so the click
+    // asks for a new tab in front, which the window then shows as a Peek
+    // (see "Peek" below). Only clicks in pages: bookmarks, menus and the URL
+    // bar keep their own meaning for Option.
+    let altPeekAt = 0;
+    try {
+      const { BrowserUtils } = ChromeUtils.importESModule("resource://gre/modules/BrowserUtils.sys.mjs");
+      const whereToOpenLink = BrowserUtils.whereToOpenLink;
+      BrowserUtils.whereToOpenLink = function (e, ignoreButton, ignoreAlt) {
+        const where = whereToOpenLink.call(this, e, ignoreButton, ignoreAlt);
+        const fromPage = !!e && typeof e.href === "string" && "referrerInfo" in e;
+        if (where === "current" && fromPage && e.altKey && !ignoreAlt && !e.shiftKey && !e.ctrlKey && !e.metaKey && e.button === 0) {
+          altPeekAt = Date.now();
+          return prefs.getBoolPref("browser.tabs.loadInBackground", true) ? "tabshifted" : "tab";
+        }
+        return where;
+      };
+    } catch (e) {
+      console.error("Arc sidebar (Option+click Peek):", e);
+    }
+
     function toggleSidebarMode() {
       const current = prefs.getStringPref(PREF, "always-show");
       prefs.setStringPref(PREF, current === "expand-on-hover" ? "always-show" : "expand-on-hover");
@@ -1852,7 +1875,7 @@ try {
         tab.setAttribute(PEEK, "");
         home.setAttribute("arc-peek-home", "");
         dragRoot.setAttribute("arc-peek", "");
-        splitButton.hidden = !isRow(home) || !!home.splitview;
+        splitButton.hidden = home.pinned || !!home.splitview;
         whenSwitched(() => {
           if (peek?.tab !== tab) {
             return;
@@ -1909,8 +1932,11 @@ try {
       gBrowser.tabContainer.addEventListener("TabOpen", e => {
         const tab = e.target;
         const opener = tab.openerTab;
-        if (!peek && opener && opener.selected && isPinnedish(opener) && !opener.splitview) {
+        // (or any link Option+clicked a moment ago, from any tab)
+        const asked = Date.now() - altPeekAt < 1500;
+        if (!peek && opener && opener.selected && !opener.splitview && (isPinnedish(opener) || asked)) {
           tab._arcPeekFrom = { opener, at: win.performance.now() };
+          altPeekAt = 0;
         }
       });
       gBrowser.tabContainer.addEventListener("TabSelect", e => {
