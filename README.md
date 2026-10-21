@@ -9,7 +9,7 @@ It's two pieces:
 - **`userChrome.css`**: the whole look (layout, sizes, colors, motion).
 - **`arc-shortcut/shortcut.cfg.js`**: the behavior (pinned rows and folders, the command bar, closing rules, tile colors, ...). It runs as a LibreWolf *autoconfig* script, installed into the app by `arc-shortcut/install.sh`.
 
-Built and tested on **LibreWolf 158** (macOS, dark mode).
+Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark and light mode.
 
 ## Features
 
@@ -109,5 +109,6 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 9. **Update safety and shortcuts**: a sidebar notice when the script isn't running (after a LibreWolf update); Cmd+Shift+C copies the page address with a "Link Copied" confirmation; Cmd+1…9 go to the tiles, then the pinned rows.
 
 10. **Auto-archive**: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`).
+11. **Light mode pass**: the auto-hide sidebar now matches the pinned one in light mode too (its light color was a guess); + New Tab uses the rows' text color in every theme.
 
 Plans and known gaps: see [TODO.md](TODO.md).

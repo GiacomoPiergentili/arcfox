@@ -4,12 +4,12 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Next
 
-- [ ] **Light mode pass**: everything was verified in dark mode (Nova Ash theme); light-mode colors are set but untested.
+- [ ] **Screenshots** in the README.
+- [ ] **License**: choose one (e.g. MIT) so others may reuse the code.
 
 ## Later
 
-- [ ] **Screenshots** in the README.
-- [ ] **License**: choose one (e.g. MIT) so others may reuse the code.
+- [ ] **Theme-independent sidebar color**: the auto-hide sidebar's color is measured from the pinned one (macOS's own window background, which CSS can't read). It matches with Nova Ash; with another theme, or a wallpaper that tints windows differently, it can be slightly off.
 
 ## Bigger projects
 
@@ -25,6 +25,7 @@ What's next for librewolf-arc, most valuable first. Move items to the README's "
 
 ## Done
 
+- [x] Light mode pass (Nova Ash): auto-hide sidebar color fixed for light mode; + New Tab text in the rows' color.
 - [x] Auto-archive: normal tabs unused for 24 hours close by themselves (`arc.archiveAfterHours`, 0 = off).
 - [x] Sidebar notice when the script isn't running (e.g. after a LibreWolf update).
 - [x] Cmd+Shift+C copies the page address, with a "Link Copied" confirmation.
