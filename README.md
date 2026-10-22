@@ -1,8 +1,10 @@
-# librewolf-arc
+# arcfox
 
-An Arc-style sidebar for [LibreWolf](https://librewolf.net) on macOS, designed to feel as if Apple had made it.
+An Arc-style sidebar for [Firefox](https://www.mozilla.org/firefox/) on macOS, designed to feel as if Apple had made it.
 
-LibreWolf's native vertical tabs become an Arc sidebar: the toolbar and URL bar live at the top of the sidebar, favorite **tiles** and **pinned rows** (with **folders**) sit above a divider, and normal tabs below it. Cmd+T opens a Spotlight-style command bar instead of a blank tab. Everything follows one spacing rhythm, one set of corner radii, fills and shadows, and the system accent color.
+> **Moving from LibreWolf to Firefox.** arcfox continues [librewolf-arc](https://github.com/GiacomoPiergentili/librewolf-arc) (its full history is here) on Mozilla's own Firefox, made lean and private with [Betterfox](https://github.com/yokoffing/Betterfox): the same engine, but Apple's passwords and passkeys work there (macOS only lets them reach apps Apple has approved, and LibreWolf isn't one). The rest of this README still describes the LibreWolf version, until the move is done.
+
+Firefox's native vertical tabs become an Arc sidebar: the toolbar and URL bar live at the top of the sidebar, favorite **tiles** and **pinned rows** (with **folders**) sit above a divider, and normal tabs below it. Cmd+T opens a Spotlight-style command bar instead of a blank tab. Everything follows one spacing rhythm, one set of corner radii, fills and shadows, and the system accent color.
 
 ![The sidebar in dark mode: tiles with the selected one in its icon's colors, pinned rows, a folder, the divider and normal tabs](docs/screenshots/sidebar-dark.png)
 
