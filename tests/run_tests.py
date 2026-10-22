@@ -133,6 +133,8 @@ return result({tabs: gBrowser.tabs.map(t => (t.pinned ? "tile:" : isRow(t) ? "ro
 TESTS = [
     ("script is installed and running", r"""
 check(root.hasAttribute("arc-script"), "the window isn't marked [arc-script]: run arc-shortcut/install.sh");
+const notSetUp = Services.console.getMessageArray().map(m => m.message || "").filter(m => /^Arc sidebar \(.*: not set up\)/.test(m));
+check(!notSetUp.length, "every feature set up (none failed): " + notSetUp.map(m => m.split("\n")[0]).join(" | "));
 check(Services.prefs.getBoolPref("arc.profileDefaultsApplied", false), "a new profile gets the settings the layout relies on");
 check(Services.prefs.getStringPref("browser.toolbars.bookmarks.visibility", "") === "never", "...bookmarks toolbar off");
 check(!gNotificationBox.getNotificationWithValue("arc-restart"), "a profile that has the look isn't asked to restart");

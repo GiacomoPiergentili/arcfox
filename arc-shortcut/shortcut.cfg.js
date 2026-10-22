@@ -23,6 +23,15 @@ try {
     const prefs = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefBranch);
     const obs = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
     const PREF = "sidebar.visibility";
+    // Errors go to the browser console (Tools > Browser Tools). Not through
+    // console.error: this file runs where there is no console, so that
+    // threw instead (and a throw in a catch escapes it).
+    const report = (what, e) => {
+      try {
+        Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService)
+          .logStringMessage(`Arc sidebar (${what}): ${e}${e?.stack ? "\n" + e.stack : ""}`);
+      } catch {}
+    };
     // Dragging a tab onto another one reorders it (as in Arc) instead of
     // pausing to create a tab group. Set here: LibreWolf's own defaults load
     // after the app's defaults/pref files and would override it there.
@@ -142,7 +151,7 @@ try {
           return where;
         };
       } catch (e) {
-        console.error("Arc sidebar (Option+click Peek):", e);
+        report("Option+click Peek", e);
       }
     };
 
@@ -153,6 +162,47 @@ try {
 
     obs.addObserver(win => {
       const doc = win.document;
+      // Each feature sets itself up on its own: if a LibreWolf update breaks
+      // one (a renamed element or function), only that feature is missing,
+      // and the browser console says which. (Its helpers are plain
+      // definitions, which can't fail, so they stay outside.)
+      const guard = (name, setUp) => {
+        try {
+          return setUp();
+        } catch (e) {
+          report(`${name}: not set up`, e);
+          return undefined;
+        }
+      };
+      // LibreWolf's own code that this script replaces goes through here, a
+      // method at a time: replace(original) gives the new version, which
+      // calls the original as it needs. If an update renamed it, LibreWolf's
+      // stays as it is and only that feature is off.
+      const patch = (name, owner, method, replace) => guard(name, () => {
+        const original = owner?.[method];
+        if (typeof replace !== "function") {
+          throw new Error("its section isn't set up");
+        }
+        if (typeof original !== "function") {
+          throw new Error(`LibreWolf's ${method} isn't there any more`);
+        }
+        owner[method] = replace(original);
+      });
+      // (the same for a property LibreWolf gives a getter and setter, looked
+      // up along the owner's prototypes: replace(descriptor) gives the new one)
+      const patchProperty = (name, owner, prop, replace) => guard(name, () => {
+        if (typeof replace !== "function") {
+          throw new Error("its section isn't set up");
+        }
+        let descriptor = null;
+        for (let o = owner; o && !descriptor; o = Object.getPrototypeOf(o)) {
+          descriptor = Object.getOwnPropertyDescriptor(o, prop);
+        }
+        if (!descriptor?.get) {
+          throw new Error(`LibreWolf's ${prop} isn't there any more`);
+        }
+        Object.defineProperty(owner, prop, { configurable: true, ...replace(descriptor) });
+      });
       // Marks the window as running this script: userChrome.css shows a
       // notice when it's missing (e.g. after a LibreWolf update replaced it)
       doc.documentElement.setAttribute("arc-script", "");
@@ -161,109 +211,118 @@ try {
       // A profile's first run with this setup: the settings the layout relies
       // on, once; what you change later stays. (A profile without the look
       // gets it linked here too, see below.)
-      if (!prefs.getBoolPref("arc.profileDefaultsApplied", false)) {
-        const setIfDefault = (name, value) => {
+      guard("profile defaults", () => {
+        if (!prefs.getBoolPref("arc.profileDefaultsApplied", false)) {
+          const setIfDefault = (name, value) => {
+            try {
+              if (prefs.prefHasUserValue(name)) {
+                return;
+              }
+              if (typeof value === "boolean") {
+                prefs.setBoolPref(name, value);
+              } else {
+                prefs.setStringPref(name, value);
+              }
+            } catch {}
+          };
+          setIfDefault("browser.toolbars.bookmarks.visibility", "never"); // no room for it in the sidebar
+          setIfDefault("browser.startup.homepage", "chrome://browser/content/blanktab.html"); // launch: the empty page with the command bar
+          setIfDefault("browser.newtabpage.enabled", false);
+          setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
+          setIfDefault("sidebar.new-sidebar.has-used", true);
+          prefs.setBoolPref("arc.profileDefaultsApplied", true);
+          // A profile without the look (made from LibreWolf's Profiles menu):
+          // its chrome folder becomes a link to this repo, and the settings
+          // that load it go on; it shows from the next start (offered below)
           try {
-            if (prefs.prefHasUserValue(name)) {
-              return;
+            const chrome = win.Services.dirsvc.get("UChrm", Ci.nsIFile);
+            const sheet = chrome.clone();
+            sheet.append("userChrome.css");
+            if (!sheet.exists() && !ARC_CHROME_DIR.startsWith("__")) {
+              if (chrome.exists() && chrome.isDirectory() && !chrome.directoryEntries.hasMoreElements()) {
+                chrome.remove(false);
+              }
+              if (!chrome.exists()) {
+                const ln = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+                ln.initWithPath("/bin/ln");
+                const proc = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
+                proc.init(ln);
+                proc.run(true, ["-s", ARC_CHROME_DIR, chrome.path], 3);
+              }
+              for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+                prefs.setBoolPref(name, true);
+              }
+              win.setTimeout(() => {
+                win.gNotificationBox?.appendNotification("arc-restart", {
+                  label: "This profile is set up for the Arc sidebar. Restart LibreWolf to see it.",
+                  priority: win.gNotificationBox.PRIORITY_INFO_HIGH,
+                }, [{
+                  label: "Restart",
+                  callback: () => win.Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart),
+                }]);
+              }, 1500);
             }
-            if (typeof value === "boolean") {
-              prefs.setBoolPref(name, value);
-            } else {
-              prefs.setStringPref(name, value);
-            }
-          } catch {}
-        };
-        setIfDefault("browser.toolbars.bookmarks.visibility", "never"); // no room for it in the sidebar
-        setIfDefault("browser.startup.homepage", "chrome://browser/content/blanktab.html"); // launch: the empty page with the command bar
-        setIfDefault("browser.newtabpage.enabled", false);
-        setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
-        setIfDefault("sidebar.new-sidebar.has-used", true);
-        prefs.setBoolPref("arc.profileDefaultsApplied", true);
-        // A profile without the look (made from LibreWolf's Profiles menu):
-        // its chrome folder becomes a link to this repo, and the settings
-        // that load it go on; it shows from the next start (offered below)
-        try {
-          const chrome = win.Services.dirsvc.get("UChrm", Ci.nsIFile);
-          const sheet = chrome.clone();
-          sheet.append("userChrome.css");
-          if (!sheet.exists() && !ARC_CHROME_DIR.startsWith("__")) {
-            if (chrome.exists() && chrome.isDirectory() && !chrome.directoryEntries.hasMoreElements()) {
-              chrome.remove(false);
-            }
-            if (!chrome.exists()) {
-              const ln = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
-              ln.initWithPath("/bin/ln");
-              const proc = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
-              proc.init(ln);
-              proc.run(true, ["-s", ARC_CHROME_DIR, chrome.path], 3);
-            }
-            for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
-              prefs.setBoolPref(name, true);
-            }
-            win.setTimeout(() => {
-              win.gNotificationBox?.appendNotification("arc-restart", {
-                label: "This profile is set up for the Arc sidebar. Restart LibreWolf to see it.",
-                priority: win.gNotificationBox.PRIORITY_INFO_HIGH,
-              }, [{
-                label: "Restart",
-                callback: () => win.Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart),
-              }]);
-            }, 1500);
+          } catch (e) {
+            report("profile set-up", e);
           }
-        } catch (e) {
-          console.error("Arc sidebar (profile set-up):", e);
         }
-      }
-      // Reuse the existing Cmd+S key: detach it from "Save Page" and run our toggle instead
-      const key = doc.getElementById("key_savePage");
-      if (!key) {
-        return;
-      }
-      key.removeAttribute("command");
-      key.addEventListener("command", toggleSidebarMode);
-      // Drop the now-wrong "⌘S" hint next to File > Save Page As (the menu item still works)
-      doc.getElementById("menu_savePage")?.removeAttribute("key");
+      });
+      // Reuse the existing Cmd+S key: detach it from "Save Page" and run our
+      // toggle instead (without it, just this is missing)
+      guard("Cmd+S", () => {
+        const key = doc.getElementById("key_savePage");
+        if (!key) {
+          return;
+        }
+        key.removeAttribute("command");
+        key.addEventListener("command", toggleSidebarMode);
+        // Drop the now-wrong "⌘S" hint next to File > Save Page As (the menu item still works)
+        doc.getElementById("menu_savePage")?.removeAttribute("key");
+      });
 
       // A sidebar button right after the window buttons does the same as
       // Cmd+S (its icon comes from userChrome.css)
-      const buttonbox = doc.querySelector("#nav-bar > .titlebar-buttonbox-container");
-      if (buttonbox) {
-        const sidebarButton = doc.createXULElement("toolbarbutton");
-        sidebarButton.id = "arc-sidebar-button";
-        sidebarButton.className = "toolbarbutton-1";
-        sidebarButton.setAttribute("tooltiptext", "Show or Auto-Hide Sidebar (⌘S)");
-        // its name for VoiceOver (toolbar buttons show only their icon)
-        sidebarButton.setAttribute("label", "Sidebar");
-        sidebarButton.addEventListener("command", toggleSidebarMode);
-        buttonbox.after(sidebarButton);
-      }
+      guard("sidebar button", () => {
+        const buttonbox = doc.querySelector("#nav-bar > .titlebar-buttonbox-container");
+        if (buttonbox) {
+          const sidebarButton = doc.createXULElement("toolbarbutton");
+          sidebarButton.id = "arc-sidebar-button";
+          sidebarButton.className = "toolbarbutton-1";
+          sidebarButton.setAttribute("tooltiptext", "Show or Auto-Hide Sidebar (⌘S)");
+          // its name for VoiceOver (toolbar buttons show only their icon)
+          sidebarButton.setAttribute("label", "Sidebar");
+          sidebarButton.addEventListener("command", toggleSidebarMode);
+          buttonbox.after(sidebarButton);
+        }
+      });
 
       // (the sidebar's bottom row: see styleSidebarMain above; normally done
       // before the window was shown)
-      styleSidebarMain(doc);
+      guard("bottom row", () => styleSidebarMain(doc));
 
       // Tiles stay a grid with the sidebar on auto-hide too (LibreWolf turns
       // them into a list there): the grid lives inside the pinned area's
       // shadow DOM, which userChrome.css can't reach. Same values LibreWolf
       // uses for the pinned sidebar.
-      const pinnedArea = doc.getElementById("pinned-tabs-container");
-      if (pinnedArea?.shadowRoot) {
-        const style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
-        style.textContent = `
-          :host([orient="vertical"]) [part~="items-wrapper"] {
-            display: grid !important;
-            grid-template-columns: repeat(auto-fit, minmax(var(--tab-pinned-min-width), auto)) !important;
-            grid-auto-rows: var(--tab-height-with-margin-padding) !important;
-            padding-inline: var(--tab-container-margin-inline-pinned-expanded) !important;
-          }
-          /* a tile sliding into a new line while a tab is dragged over the
-             tiles (LibreWolf fixes this box's height during drags) */
-          :host([arc-tiles-growing]) [part~="scrollbox"] {
-            overflow: visible !important;
-          }`;
-        pinnedArea.shadowRoot.append(style);
-      }
+      guard("tile grid", () => {
+        const pinnedArea = doc.getElementById("pinned-tabs-container");
+        if (pinnedArea?.shadowRoot) {
+          const style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
+          style.textContent = `
+            :host([orient="vertical"]) [part~="items-wrapper"] {
+              display: grid !important;
+              grid-template-columns: repeat(auto-fit, minmax(var(--tab-pinned-min-width), auto)) !important;
+              grid-auto-rows: var(--tab-height-with-margin-padding) !important;
+              padding-inline: var(--tab-container-margin-inline-pinned-expanded) !important;
+            }
+            /* a tile sliding into a new line while a tab is dragged over the
+               tiles (LibreWolf fixes this box's height during drags) */
+            :host([arc-tiles-growing]) [part~="scrollbox"] {
+              overflow: visible !important;
+            }`;
+          pinnedArea.shadowRoot.append(style);
+        }
+      });
 
       // Favorite tiles, pinned rows and folders (Arc-style).
       //   Tiles are LibreWolf's own pinned tabs (Cmd+Shift+D).
@@ -609,7 +668,7 @@ try {
       // Private windows keep to themselves.
       const TILES_PREF = "arc.tiles";
       const ITEM_ID = "arc-id";
-      const isPrivate = win.PrivateBrowsingUtils.isWindowPrivate(win);
+      const isPrivate = !!win.PrivateBrowsingUtils?.isWindowPrivate(win);
       const setItemId = (tab, id) => {
         tab.setAttribute(ITEM_ID, id);
         try {
@@ -802,78 +861,80 @@ try {
       // Restored once LibreWolf's own session restore (the tiles) is done: it
       // dissolved folders made before it, leaving their tabs as plain rows.
       // Another window builds the list from the shared one instead.
-      if (!isPrivate) {
-        SessionStore.promiseAllWindowsRestored.then(() => {
-          try {
-            if (firstWindow) {
-              restoreRows();
-            } else {
-              reconcile();
+      guard("saving and restoring", () => {
+        if (!isPrivate) {
+          SessionStore.promiseAllWindowsRestored.then(() => {
+            try {
+              if (firstWindow) {
+                restoreRows();
+              } else {
+                reconcile();
+              }
+            } finally {
+              rowsRestored = true;
+              scheduleSave();
             }
-          } finally {
-            rowsRestored = true;
+          });
+        }
+        // Pinned tabs start on their pinned page (tiles come back from
+        // LibreWolf's session where they were left). Ones pinned before this
+        // feature take the page they show now.
+        SessionStore.promiseAllWindowsRestored?.then(() => {
+          for (const tab of gBrowser.tabs) {
+            if (isPinnedish(tab)) {
+              ensureHome(tab);
+              if (isAway(tab)) {
+                goHome(tab);
+              }
+            }
+          }
+        });
+        gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
+          const tab = e.target;
+          // the pinned page's title and icon: the page's own, once it has loaded
+          // (when the pinned page is recorded it may still show the address)
+          const home = isPinnedish(tab) && !tab.hasAttribute("busy") && !tab.hasAttribute("pending") && getHome(tab);
+          const icon = home && (iconOf(tab) || home.icon);
+          const cleanUrl = home && withoutChallenge(home.url);
+          if (home && (home.title !== tab.label || home.icon !== icon || home.url !== cleanUrl) && samePage(pageUrl(tab), home.url)) {
+            setHome(tab, { ...home, url: cleanUrl, title: tab.label, icon });
+          } else if (isRow(tab)) {
             scheduleSave();
           }
         });
-      }
-      // Pinned tabs start on their pinned page (tiles come back from
-      // LibreWolf's session where they were left). Ones pinned before this
-      // feature take the page they show now.
-      SessionStore.promiseAllWindowsRestored?.then(() => {
-        for (const tab of gBrowser.tabs) {
-          if (isPinnedish(tab)) {
-            ensureHome(tab);
-            if (isAway(tab)) {
-              goHome(tab);
-            }
+        gBrowser.tabContainer.addEventListener("TabMove", e => isPinnedish(e.target) && scheduleSave());
+        gBrowser.tabContainer.addEventListener("TabClose", e => {
+          if (!isPinnedish(e.target)) {
+            return;
           }
-        }
-      });
-      gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
-        const tab = e.target;
-        // the pinned page's title and icon: the page's own, once it has loaded
-        // (when the pinned page is recorded it may still show the address)
-        const home = isPinnedish(tab) && !tab.hasAttribute("busy") && !tab.hasAttribute("pending") && getHome(tab);
-        const icon = home && (iconOf(tab) || home.icon);
-        const cleanUrl = home && withoutChallenge(home.url);
-        if (home && (home.title !== tab.label || home.icon !== icon || home.url !== cleanUrl) && samePage(pageUrl(tab), home.url)) {
-          setHome(tab, { ...home, url: cleanUrl, title: tab.label, icon });
-        } else if (isRow(tab)) {
+          // dragged into another window: it's still in the shared list, so
+          // this window gets its own copy back instead of dropping it everywhere
+          if (e.detail?.adoptedBy) {
+            win.setTimeout(() => reconcile(), 300);
+            return;
+          }
           scheduleSave();
+        });
+        gBrowser.tabContainer.addEventListener("TabPinned", scheduleSave);
+        gBrowser.tabContainer.addEventListener("TabUnpinned", scheduleSave);
+        for (const type of ["TabGroupCreate", "TabGrouped", "TabUngrouped", "TabGroupRemoved", "SplitViewCreated", "SplitViewRemoved"]) {
+          gBrowser.tabContainer.addEventListener(type, scheduleNormalize);
         }
-      });
-      gBrowser.tabContainer.addEventListener("TabMove", e => isPinnedish(e.target) && scheduleSave());
-      gBrowser.tabContainer.addEventListener("TabClose", e => {
-        if (!isPinnedish(e.target)) {
-          return;
+        // A folder made from the menu moves into the block before LibreWolf
+        // opens its "name this folder" panel next to it
+        gBrowser.tabContainer.addEventListener("TabGroupCreateByUser", normalize, true);
+        for (const type of ["TabGroupUpdate", "TabGroupCollapse", "TabGroupExpand"]) {
+          gBrowser.tabContainer.addEventListener(type, scheduleSave);
         }
-        // dragged into another window: it's still in the shared list, so
-        // this window gets its own copy back instead of dropping it everywhere
-        if (e.detail?.adoptedBy) {
-          win.setTimeout(() => reconcile(), 300);
-          return;
-        }
-        scheduleSave();
-      });
-      gBrowser.tabContainer.addEventListener("TabPinned", scheduleSave);
-      gBrowser.tabContainer.addEventListener("TabUnpinned", scheduleSave);
-      for (const type of ["TabGroupCreate", "TabGrouped", "TabUngrouped", "TabGroupRemoved", "SplitViewCreated", "SplitViewRemoved"]) {
-        gBrowser.tabContainer.addEventListener(type, scheduleNormalize);
-      }
-      // A folder made from the menu moves into the block before LibreWolf
-      // opens its "name this folder" panel next to it
-      gBrowser.tabContainer.addEventListener("TabGroupCreateByUser", normalize, true);
-      for (const type of ["TabGroupUpdate", "TabGroupCollapse", "TabGroupExpand"]) {
-        gBrowser.tabContainer.addEventListener(type, scheduleSave);
-      }
-      gBrowser.addTabsProgressListener({
-        onLocationChange(browser) {
-          const tab = gBrowser.getTabForBrowser(browser);
-          if (tab && isPinnedish(tab)) {
-            ensureHome(tab);
-            updateAway(tab);
-          }
-        },
+        gBrowser.addTabsProgressListener({
+          onLocationChange(browser) {
+            const tab = gBrowser.getTabForBrowser(browser);
+            if (tab && isPinnedish(tab)) {
+              ensureHome(tab);
+              updateAway(tab);
+            }
+          },
+        });
       });
 
       // --- motion: tabs opening, closing and being pinned ---
@@ -884,9 +945,9 @@ try {
       const SETTLE = "cubic-bezier(0.32, 0.72, 0, 1)"; // (the folder rows' curve)
       const motionOK = () => !win.matchMedia("(prefers-reduced-motion: reduce)").matches &&
         !dragRoot.hasAttribute("arc-starting") && !dragRoot.hasAttribute("arc-dragging");
-      // ([arc-folding]: see userChrome.css)
-      const slideRow = (el, open, done) => {
-        const height = el.getBoundingClientRect().height;
+      // ([arc-folding]: see userChrome.css; height: for a row already hidden,
+      // as measured while it was shown)
+      const slideRow = (el, open, done, height = el.getBoundingClientRect().height) => {
         if (!height) {
           done?.();
           return;
@@ -913,8 +974,8 @@ try {
       const slidingShut = new Set();
       const adoptedTabs = new WeakSet(); // dragged into another window
       gBrowser.tabContainer.addEventListener("TabClose", e => e.detail?.adoptedBy && adoptedTabs.add(e.target));
-      const endRemoveTab = gBrowser._endRemoveTab.bind(gBrowser);
-      gBrowser._endRemoveTab = tab => {
+      const slideShutBeforeRemoving = original => tab => {
+        const endRemoveTab = t => original.call(gBrowser, t);
         if (!tab?._endRemoveArgs) {
           return endRemoveTab(tab);
         }
@@ -933,30 +994,32 @@ try {
       };
       // Opening (a handful at a time: a whole session or folder opening at
       // once just appears)
-      let openedLately = [];
-      gBrowser.tabContainer.addEventListener("TabOpen", e => {
-        const tab = e.target;
-        const now = win.performance.now();
-        openedLately = openedLately.filter(t => now - t < 150);
-        openedLately.push(now);
-        if (!motionOK() || openedLately.length > 3) {
-          return;
-        }
-        // (from its very first frame; a Peek, the empty start page or a split
-        // view's tab, known only once it's settled, don't slide after all)
-        if (tab.pinned || tab.splitview) {
-          return;
-        }
-        slideRow(tab, true);
-        win.requestAnimationFrame(() => {
-          if (!tab.isConnected || tab.pinned || tab.splitview ||
-              tab.hasAttribute("arc-peek-tab") || tab.hasAttribute("arc-start-page")) {
-            for (const a of tab.getAnimations()) {
-              if (a.id === "arc-fold") {
-                a.finish();
+      guard("tabs sliding open", () => {
+        let openedLately = [];
+        gBrowser.tabContainer.addEventListener("TabOpen", e => {
+          const tab = e.target;
+          const now = win.performance.now();
+          openedLately = openedLately.filter(t => now - t < 150);
+          openedLately.push(now);
+          if (!motionOK() || openedLately.length > 3) {
+            return;
+          }
+          // (from its very first frame; a Peek, the empty start page or a split
+          // view's tab, known only once it's settled, don't slide after all)
+          if (tab.pinned || tab.splitview) {
+            return;
+          }
+          slideRow(tab, true);
+          win.requestAnimationFrame(() => {
+            if (!tab.isConnected || tab.pinned || tab.splitview ||
+                tab.hasAttribute("arc-peek-tab") || tab.hasAttribute("arc-start-page")) {
+              for (const a of tab.getAnimations()) {
+                if (a.id === "arc-fold") {
+                  a.finish();
+                }
               }
             }
-          }
+          });
         });
       });
       // Pinning and unpinning: every item's place is noted before, and each
@@ -1026,10 +1089,12 @@ try {
         fn();
         glideFrom(places);
       };
-      // (LibreWolf's own Pin Tab / Unpin Tab menu items too)
-      for (const id of ["context_pinTab", "context_unpinTab", "context_pinSelectedTabs", "context_unpinSelectedTabs"]) {
-        doc.getElementById(id)?.addEventListener("command", () => glideFrom(notePlaces()), true);
-      }
+      guard("pin glide from the menu", () => {
+        // (LibreWolf's own Pin Tab / Unpin Tab menu items too)
+        for (const id of ["context_pinTab", "context_unpinTab", "context_pinSelectedTabs", "context_unpinSelectedTabs"]) {
+          doc.getElementById(id)?.addEventListener("command", () => glideFrom(notePlaces()), true);
+        }
+      });
 
       // --- shortcuts ---
       const toggleRow = () => {
@@ -1099,19 +1164,21 @@ try {
         try {
           fn();
         } catch (e) {
-          console.error(`Arc sidebar (${via}):`, e);
+          report(via, e);
         }
       };
-      rebind("addBookmarkAsKb", "menu_bookmarkThisPage", () => run(withGlide(toggleRow), "key-command"));   // Cmd+D (was Bookmark This Page)
-      rebind("bookmarkAllTabsKb", "menu_bookmarkAllTabs", () => run(withGlide(toggleTile), "key-command")); // Cmd+Shift+D (was Bookmark All Tabs)
-      // Direct route: catch the key press itself before anything else does
-      win.addEventListener("keydown", e => {
-        if (e.code === "KeyD" && e.metaKey && !e.ctrlKey && !e.altKey) {
-          e.preventDefault();
-          e.stopPropagation();
-          run(withGlide(e.shiftKey ? toggleTile : toggleRow), "keydown");
-        }
-      }, true);
+      guard("Cmd+D / Cmd+Shift+D", () => {
+        rebind("addBookmarkAsKb", "menu_bookmarkThisPage", () => run(withGlide(toggleRow), "key-command"));   // Cmd+D (was Bookmark This Page)
+        rebind("bookmarkAllTabsKb", "menu_bookmarkAllTabs", () => run(withGlide(toggleTile), "key-command")); // Cmd+Shift+D (was Bookmark All Tabs)
+        // Direct route: catch the key press itself before anything else does
+        win.addEventListener("keydown", e => {
+          if (e.code === "KeyD" && e.metaKey && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            run(withGlide(e.shiftKey ? toggleTile : toggleRow), "keydown");
+          }
+        }, true);
+      });
 
       // A short confirmation over the page, e.g. "Link Copied" (styled in
       // userChrome.css as #arc-toast)
@@ -1147,7 +1214,9 @@ try {
         Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString(url);
         showToast("Link Copied");
       };
-      doc.getElementById("key_inspectorMac")?.setAttribute("disabled", "true");
+      guard("Cmd+Shift+C", () => {
+        doc.getElementById("key_inspectorMac")?.setAttribute("disabled", "true");
+      });
 
       // Cmd+1…9 go to the tiles in order, then on to the pinned rows (a
       // collapsed folder's hidden rows don't count). LibreWolf's own (the 1st to 8th
@@ -1156,31 +1225,33 @@ try {
         ...gBrowser.tabs.filter(t => t.pinned),
         ...gBrowser.tabs.filter(t => !t.pinned && isRow(t) && (!t.group?.collapsed || t.visible)),
       ];
-      for (const id of ["key_selectTab1", "key_selectTab2", "key_selectTab3", "key_selectTab4", "key_selectTab5",
-                        "key_selectTab6", "key_selectTab7", "key_selectTab8", "key_selectLastTab"]) {
-        doc.getElementById(id)?.setAttribute("disabled", "true");
-      }
+      guard("Cmd+1…9 and Cmd+Shift+C", () => {
+        for (const id of ["key_selectTab1", "key_selectTab2", "key_selectTab3", "key_selectTab4", "key_selectTab5",
+                          "key_selectTab6", "key_selectTab7", "key_selectTab8", "key_selectLastTab"]) {
+          doc.getElementById(id)?.setAttribute("disabled", "true");
+        }
 
-      win.addEventListener("keydown", e => {
-        if (!e.metaKey || e.ctrlKey || e.altKey) {
-          return;
-        }
-        if (e.code === "KeyC" && e.shiftKey) {
-          e.preventDefault();
-          e.stopPropagation();
-          copyAddress();
-          return;
-        }
-        const n = /^Digit([1-9])$/.exec(e.code)?.[1];
-        if (n && !e.shiftKey) {
-          e.preventDefault();
-          e.stopPropagation();
-          const tab = pinnedInOrder()[n - 1];
-          if (tab) {
-            gBrowser.selectedTab = tab;
+        win.addEventListener("keydown", e => {
+          if (!e.metaKey || e.ctrlKey || e.altKey) {
+            return;
           }
-        }
-      }, true);
+          if (e.code === "KeyC" && e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            copyAddress();
+            return;
+          }
+          const n = /^Digit([1-9])$/.exec(e.code)?.[1];
+          if (n && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            const tab = pinnedInOrder()[n - 1];
+            if (tab) {
+              gBrowser.selectedTab = tab;
+            }
+          }
+        }, true);
+      });
 
       // --- the menu bar ---
       // Every command has its place in the menu bar with its shortcut, as
@@ -1189,66 +1260,68 @@ try {
       // Edit. Their keys are new ones of ours, only there to show the
       // shortcut in the menu (LibreWolf's own for these keys are switched
       // off); the key presses themselves are caught above.
-      const keyset = doc.getElementById("mainKeyset");
-      const menuKey = (id, key, modifiers) => {
-        if (!doc.getElementById(id) && keyset) {
-          const k = doc.createXULElement("key");
-          k.id = id;
-          k.setAttribute("key", key);
-          k.setAttribute("modifiers", modifiers);
-          keyset.append(k);
+      guard("menu bar", () => {
+        const keyset = doc.getElementById("mainKeyset");
+        const menuKey = (id, key, modifiers) => {
+          if (!doc.getElementById(id) && keyset) {
+            const k = doc.createXULElement("key");
+            k.id = id;
+            k.setAttribute("key", key);
+            k.setAttribute("modifiers", modifiers);
+            keyset.append(k);
+          }
+          return id;
+        };
+        const menuItem = (id, keyId, action) => {
+          const item = doc.createXULElement("menuitem");
+          item.id = id;
+          if (keyId) {
+            item.setAttribute("key", keyId);
+          }
+          item.addEventListener("command", action);
+          return item;
+        };
+        const windowMenu = doc.getElementById("windowPopup");
+        if (windowMenu) {
+          const rowItem = menuItem("arc-menu-row", menuKey("arc-key-row", "D", "accel"), () => run(withGlide(toggleRow), "menu"));
+          const tileItem = menuItem("arc-menu-tile", menuKey("arc-key-tile", "D", "accel,shift"), () => run(withGlide(toggleTile), "menu"));
+          windowMenu.prepend(rowItem, tileItem, doc.createXULElement("menuseparator"));
+          windowMenu.addEventListener("popupshowing", e => {
+            if (e.target !== windowMenu) {
+              return;
+            }
+            const tab = gBrowser.selectedTab;
+            const blank = tab.hasAttribute("arc-start-page");
+            rowItem.setAttribute("label", isRow(tab) ? "Unpin Row" : "Pin as Row");
+            tileItem.setAttribute("label", tab.pinned ? "Unpin Tile" : "Pin as Tile");
+            rowItem.toggleAttribute("disabled", blank);
+            tileItem.toggleAttribute("disabled", blank);
+          });
         }
-        return id;
-      };
-      const menuItem = (id, keyId, action) => {
-        const item = doc.createXULElement("menuitem");
-        item.id = id;
-        if (keyId) {
-          item.setAttribute("key", keyId);
+        const viewMenu = doc.getElementById("menu_viewPopup");
+        if (viewMenu) {
+          const sidebarItem = menuItem("arc-menu-sidebar", "key_savePage", toggleSidebarMode);
+          doc.getElementById("viewSidebarMenuMenu")?.after(sidebarItem);
+          viewMenu.addEventListener("popupshowing", e => {
+            if (e.target === viewMenu) {
+              sidebarItem.setAttribute("label",
+                prefs.getStringPref(PREF, "always-show") === "expand-on-hover" ? "Always Show Sidebar" : "Auto-Hide Sidebar");
+            }
+          });
         }
-        item.addEventListener("command", action);
-        return item;
-      };
-      const windowMenu = doc.getElementById("windowPopup");
-      if (windowMenu) {
-        const rowItem = menuItem("arc-menu-row", menuKey("arc-key-row", "D", "accel"), () => run(withGlide(toggleRow), "menu"));
-        const tileItem = menuItem("arc-menu-tile", menuKey("arc-key-tile", "D", "accel,shift"), () => run(withGlide(toggleTile), "menu"));
-        windowMenu.prepend(rowItem, tileItem, doc.createXULElement("menuseparator"));
-        windowMenu.addEventListener("popupshowing", e => {
-          if (e.target !== windowMenu) {
-            return;
-          }
-          const tab = gBrowser.selectedTab;
-          const blank = tab.hasAttribute("arc-start-page");
-          rowItem.setAttribute("label", isRow(tab) ? "Unpin Row" : "Pin as Row");
-          tileItem.setAttribute("label", tab.pinned ? "Unpin Tile" : "Pin as Tile");
-          rowItem.toggleAttribute("disabled", blank);
-          tileItem.toggleAttribute("disabled", blank);
-        });
-      }
-      const viewMenu = doc.getElementById("menu_viewPopup");
-      if (viewMenu) {
-        const sidebarItem = menuItem("arc-menu-sidebar", "key_savePage", toggleSidebarMode);
-        doc.getElementById("viewSidebarMenuMenu")?.after(sidebarItem);
-        viewMenu.addEventListener("popupshowing", e => {
-          if (e.target === viewMenu) {
-            sidebarItem.setAttribute("label",
-              prefs.getStringPref(PREF, "always-show") === "expand-on-hover" ? "Always Show Sidebar" : "Auto-Hide Sidebar");
-          }
-        });
-      }
-      const editMenu = doc.getElementById("menu_EditPopup");
-      if (editMenu) {
-        const copyItem = menuItem("arc-menu-copy-link", menuKey("arc-key-copy-link", "C", "accel,shift"), copyAddress);
-        copyItem.setAttribute("label", "Copy Link");
-        (doc.getElementById("menu_delete") || doc.getElementById("menu_paste"))?.after(copyItem);
-        editMenu.addEventListener("popupshowing", e => {
-          if (e.target === editMenu) {
-            const url = gBrowser.selectedBrowser.currentURI?.spec;
-            copyItem.toggleAttribute("disabled", !url || win.isBlankPageURL(url) || gBrowser.selectedTab.hasAttribute("arc-start-page"));
-          }
-        });
-      }
+        const editMenu = doc.getElementById("menu_EditPopup");
+        if (editMenu) {
+          const copyItem = menuItem("arc-menu-copy-link", menuKey("arc-key-copy-link", "C", "accel,shift"), copyAddress);
+          copyItem.setAttribute("label", "Copy Link");
+          (doc.getElementById("menu_delete") || doc.getElementById("menu_paste"))?.after(copyItem);
+          editMenu.addEventListener("popupshowing", e => {
+            if (e.target === editMenu) {
+              const url = gBrowser.selectedBrowser.currentURI?.spec;
+              copyItem.toggleAttribute("disabled", !url || win.isBlankPageURL(url) || gBrowser.selectedTab.hasAttribute("arc-start-page"));
+            }
+          });
+        }
+      });
 
       // --- folders opening and closing ---
       // A collapsed folder keeps showing its loaded tabs (unloaded ones hide;
@@ -1256,64 +1329,43 @@ try {
       // its rows slide open and shut (as in the Finder's sidebar). The
       // folder icon's front tilts open with it (userChrome.css).
       const folderClass = win.customElements.get("tab-group");
-      if (folderClass && !folderClass.prototype._arcFolding) {
-        const proto = folderClass.prototype;
-        proto._arcFolding = true;
-        const isLoaded = tab => !tab.hasAttribute("pending");
-        // (what LibreWolf's own code counts as shown: keyboard moves, drags)
-        const isTabVisibleInGroup = proto.isTabVisibleInGroup;
-        proto.isTabVisibleInGroup = function (tab) {
-          return isTabVisibleInGroup.call(this, tab) ||
-            (this.collapsed && !this.isBeingDragged && !tab.splitview && isLoaded(tab));
-        };
-        const collapsedProp = Object.getOwnPropertyDescriptor(proto, "collapsed");
-        Object.defineProperty(proto, "collapsed", {
-          ...collapsedProp,
-          set(val) {
-            const group = this;
-            const rows = () => [...group.querySelectorAll(":scope > .tabbrowser-tab, :scope > tab-split-view-wrapper")];
-            // (shown rows and their heights)
-            const shown = () => new Map(rows().map(el => [el, el.getBoundingClientRect().height]).filter(([, h]) => h > 0));
-            const w = group.ownerDocument.defaultView;
-            const animate = !!val !== group.collapsed && group.isConnected &&
-              !w.document.documentElement.hasAttribute("arc-starting") &&
-              !w.gBrowser.tabContainer.hasAttribute("movingtab") && !group.isBeingDragged &&
-              !w.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            const before = animate ? shown() : null;
-            collapsedProp.set.call(group, val);
-            if (!animate) {
-              return;
-            }
-            const after = shown();
-            const changed = val ? [...before].filter(([el]) => !after.has(el)) : [...after].filter(([el]) => !before.has(el));
-            for (const [el, height] of changed) {
-              for (const a of el.getAnimations()) {
-                if (a.id === "arc-fold") {
-                  a.cancel();
-                }
-              }
-              // ([arc-folding] moves the row's gaps inside it, so the whole
-              // height can shrink: userChrome.css)
-              const open = { height: `${height}px`, opacity: 1 };
-              const shut = { height: "0px", opacity: 0 };
-              el.setAttribute("arc-folding", "");
-              const anim = el.animate(val ? [open, shut] : [shut, open], {
-                id: "arc-fold",
-                duration: val ? 220 : 280,
-                easing: "cubic-bezier(0.32, 0.72, 0, 1)",
-              });
-              anim.finished.then(() => el.removeAttribute("arc-folding"), () => {});
-            }
-          },
-        });
-        // a tab in a collapsed folder loading or unloading shows or hides it:
-        // LibreWolf's list of shown tabs must hear about it
+      const isLoaded = tab => !tab.hasAttribute("pending");
+      // (what LibreWolf's own code counts as shown: keyboard moves, drags)
+      const showLoadedTabs = original => function (tab) {
+        return original.call(this, tab) ||
+          (this.collapsed && !this.isBeingDragged && !tab.splitview && isLoaded(tab));
+      };
+      // the rows that hide or show slide shut or open (see "motion" above)
+      const slideFolderRows = collapsed => ({
+        ...collapsed,
+        set(val) {
+          const group = this;
+          const rows = () => [...group.querySelectorAll(":scope > .tabbrowser-tab, :scope > tab-split-view-wrapper")];
+          // (shown rows and their heights)
+          const shown = () => new Map(rows().map(el => [el, el.getBoundingClientRect().height]).filter(([, h]) => h > 0));
+          const animate = !!val !== group.collapsed && group.isConnected && motionOK() &&
+            !gBrowser.tabContainer.hasAttribute("movingtab") && !group.isBeingDragged;
+          const before = animate ? shown() : null;
+          collapsed.set.call(group, val);
+          if (!animate) {
+            return;
+          }
+          const after = shown();
+          const changed = val ? [...before].filter(([el]) => !after.has(el)) : [...after].filter(([el]) => !before.has(el));
+          for (const [el, height] of changed) {
+            slideRow(el, !val, null, height);
+          }
+        },
+      });
+      // a tab in a collapsed folder loading or unloading shows or hides it:
+      // LibreWolf's list of shown tabs must hear about it
+      guard("folders: loaded tabs stay in view", () => {
         new win.MutationObserver(records => {
           if (records.some(r => r.target.group?.collapsed)) {
             gBrowser.tabContainer._invalidateCachedVisibleTabs?.();
           }
         }).observe(gBrowser.tabContainer, { attributes: true, attributeFilter: ["pending"], subtree: true });
-      }
+      });
 
       // --- the auto-hide sidebar's color ---
       // The pinned sidebar shows macOS's window background (from the theme,
@@ -1374,26 +1426,28 @@ try {
               prefs.setStringPref(SIDEBAR_COLOR_PREF + scheme, `${r}, ${g}, ${b}`);
             }
           } catch (e) {
-            console.error("Arc sidebar (sidebar color):", e);
+            report("sidebar color", e);
           }
         }, delay);
       };
-      applySidebarColors();
-      // every window follows a new measurement (from any window)
-      const sidebarColorObserver = { observe: () => applySidebarColors() };
-      prefs.addObserver(SIDEBAR_COLOR_PREF, sidebarColorObserver);
-      // theme changes
-      const themeObserver = { observe: () => measureSidebar(500) };
-      obs.addObserver(themeObserver, "lightweight-theme-styling-update");
-      win.addEventListener("unload", () => {
-        prefs.removeObserver(SIDEBAR_COLOR_PREF, sidebarColorObserver);
-        obs.removeObserver(themeObserver, "lightweight-theme-styling-update");
-      }, { once: true });
-      win.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => measureSidebar(500));
-      win.addEventListener("activate", () => measureSidebar(300));
-      new win.MutationObserver(() => measureSidebar(600))
-        .observe(doc.documentElement, { attributes: true, attributeFilter: ["sidebar-expand-on-hover"] });
-      SessionStore.promiseAllWindowsRestored.then(() => measureSidebar(1000));
+      guard("sidebar color", () => {
+        applySidebarColors();
+        // every window follows a new measurement (from any window)
+        const sidebarColorObserver = { observe: () => applySidebarColors() };
+        prefs.addObserver(SIDEBAR_COLOR_PREF, sidebarColorObserver);
+        // theme changes
+        const themeObserver = { observe: () => measureSidebar(500) };
+        obs.addObserver(themeObserver, "lightweight-theme-styling-update");
+        win.addEventListener("unload", () => {
+          prefs.removeObserver(SIDEBAR_COLOR_PREF, sidebarColorObserver);
+          obs.removeObserver(themeObserver, "lightweight-theme-styling-update");
+        }, { once: true });
+        win.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => measureSidebar(500));
+        win.addEventListener("activate", () => measureSidebar(300));
+        new win.MutationObserver(() => measureSidebar(600))
+          .observe(doc.documentElement, { attributes: true, attributeFilter: ["sidebar-expand-on-hover"] });
+        SessionStore.promiseAllWindowsRestored.then(() => measureSidebar(1000));
+      });
 
       // --- auto-archive (as in Arc) ---
       // Normal tabs left unused for arc.archiveAfterHours (24 by default, 0 =
@@ -1416,67 +1470,71 @@ try {
           gBrowser.removeTab(tab, { animate: false, skipPermitUnload: true });
         }
       };
-      // shortly after launch (once the session is back), then every 10 minutes
-      SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(archiveOldTabs, 30 * 1000));
-      win.setInterval(archiveOldTabs, 10 * 60 * 1000);
+      guard("auto-archive", () => {
+        // shortly after launch (once the session is back), then every 10 minutes
+        SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(archiveOldTabs, 30 * 1000));
+        win.setInterval(archiveOldTabs, 10 * 60 * 1000);
+      });
 
       // --- keeping the row block intact ---
       // A tile is never a row. A tab opened inside the block (a link from a
       // row or a folder tab: it has an opener) goes below it, as in Arc; one
       // added to a folder on purpose ("New Tab in Group") becomes a row of
       // that folder.
-      gBrowser.tabContainer.addEventListener("TabPinned", e => {
-        if (isRow(e.target)) {
-          setRow(e.target, false);
-        }
-        ensureHome(e.target);
-      });
-      gBrowser.tabContainer.addEventListener("TabUnpinned", e => forgetHomeLater(e.target));
-      gBrowser.tabContainer.addEventListener("TabOpen", e => {
-        const tab = e.target;
-        if (tab.group && tab.openerTab) {
-          leavingFolder.add(tab);
-        }
-        win.setTimeout(() => {
-          // (one opened into a split view, e.g. LibreWolf's "choose a tab"
-          // page or a restored split view, stays there)
-          if (!tab.isConnected || tab.pinned || isRow(tab) || tab.splitview) {
-            return;
+      guard("row block", () => {
+        gBrowser.tabContainer.addEventListener("TabPinned", e => {
+          if (isRow(e.target)) {
+            setRow(e.target, false);
           }
-          if (tab.group) {
-            if (leavingFolder.has(tab)) {
-              leavingFolder.delete(tab);
-              gBrowser.ungroupTab(tab);
-              moveToRowBlockEnd(tab);
-            } else {
-              scheduleNormalize();
+          ensureHome(e.target);
+        });
+        gBrowser.tabContainer.addEventListener("TabUnpinned", e => forgetHomeLater(e.target));
+        gBrowser.tabContainer.addEventListener("TabOpen", e => {
+          const tab = e.target;
+          if (tab.group && tab.openerTab) {
+            leavingFolder.add(tab);
+          }
+          win.setTimeout(() => {
+            // (one opened into a split view, e.g. LibreWolf's "choose a tab"
+            // page or a restored split view, stays there)
+            if (!tab.isConnected || tab.pinned || isRow(tab) || tab.splitview) {
+              return;
             }
-            return;
-          }
-          const items = listItems();
-          if (items.slice(items.indexOf(tab) + 1).some(inBlock)) {
-            moveToRowBlockEnd(tab);
-          }
-        }, 0);
-      });
+            if (tab.group) {
+              if (leavingFolder.has(tab)) {
+                leavingFolder.delete(tab);
+                gBrowser.ungroupTab(tab);
+                moveToRowBlockEnd(tab);
+              } else {
+                scheduleNormalize();
+              }
+              return;
+            }
+            const items = listItems();
+            if (items.slice(items.indexOf(tab) + 1).some(inBlock)) {
+              moveToRowBlockEnd(tab);
+            }
+          }, 0);
+        });
 
-      // No new tab from the tab list's empty space: LibreWolf opens one on a
-      // double-click there (which includes the gaps between rows, so it
-      // seemed random) or a middle-click below the last tab, bypassing the
-      // New Tab command and its floating URL bar. Middle-clicking a tab or a
-      // folder still works.
-      gBrowser.tabContainer.addEventListener("dblclick", e => {
-        if (e.target === gBrowser.tabContainer.arrowScrollbox) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
-      }, true);
-      gBrowser.tabContainer.addEventListener("click", e => {
-        if (e.button === 1 && !e.target.closest?.("tab, tab-group, .tab-group-label-container")) {
-          e.stopPropagation();
-          e.preventDefault();
-        }
-      }, true);
+        // No new tab from the tab list's empty space: LibreWolf opens one on a
+        // double-click there (which includes the gaps between rows, so it
+        // seemed random) or a middle-click below the last tab, bypassing the
+        // New Tab command and its floating URL bar. Middle-clicking a tab or a
+        // folder still works.
+        gBrowser.tabContainer.addEventListener("dblclick", e => {
+          if (e.target === gBrowser.tabContainer.arrowScrollbox) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }, true);
+        gBrowser.tabContainer.addEventListener("click", e => {
+          if (e.button === 1 && !e.target.closest?.("tab, tab-group, .tab-group-label-container")) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }, true);
+      });
 
       // --- + New Tab right under the divider (as in Arc) ---
       // userChrome.css shows LibreWolf's end-of-list box (which holds the
@@ -1484,18 +1542,11 @@ try {
       // of the tab list, so it's told where the list really ends.
       const periphery = doc.getElementById("tabbrowser-arrowscrollbox-periphery");
       let listEndScreenY = null;
-      let screenYDesc = null;
-      for (let proto = periphery && Object.getPrototypeOf(periphery); proto && !screenYDesc; proto = Object.getPrototypeOf(proto)) {
-        screenYDesc = Object.getOwnPropertyDescriptor(proto, "screenY");
-      }
-      if (screenYDesc?.get) {
-        Object.defineProperty(periphery, "screenY", {
-          configurable: true,
-          get() {
-            return listEndScreenY ?? screenYDesc.get.call(this);
-          },
-        });
-      }
+      const reportListEnd = screenY => ({
+        get() {
+          return listEndScreenY ?? screenY.get.call(this);
+        },
+      });
 
       // --- drag and drop ---
       // Dropped above the divider (inside the row block) -> pinned row; below
@@ -1634,33 +1685,35 @@ try {
           gBrowser.moveTabAfter(tab, others.at(-1));
         }
       };
-      // Place it in the same frame LibreWolf unpins it, so it never shows up
-      // at the top first
-      gBrowser.tabContainer.addEventListener("TabPinned", e => {
-        const drop = pendingDrop;
-        if (drop?.tileBefore && drop.moving.includes(e.target)) {
-          // once LibreWolf is done with the drop (it moves the tab itself
-          // after pinning it), still before the next frame
-          const tab = e.target;
-          Promise.resolve().then(() => {
-            if (drop.tileBefore.isConnected && drop.tileBefore.pinned && tab.pinned && drop.tileBefore !== tab) {
-              gBrowser.moveTabBefore(tab, drop.tileBefore);
-            }
-          });
-        }
-      });
-      gBrowser.tabContainer.addEventListener("TabUnpinned", e => {
-        const drop = pendingDrop;
-        if (drop?.wasTile.includes(e.target)) {
-          const tab = e.target;
-          placeAt(tab, drop.y, drop.moving);
-          if (drop.toRow) {
-            setRow(tab, true);
+      guard("drag and drop: tiles", () => {
+        // Place it in the same frame LibreWolf unpins it, so it never shows up
+        // at the top first
+        gBrowser.tabContainer.addEventListener("TabPinned", e => {
+          const drop = pendingDrop;
+          if (drop?.tileBefore && drop.moving.includes(e.target)) {
+            // once LibreWolf is done with the drop (it moves the tab itself
+            // after pinning it), still before the next frame
+            const tab = e.target;
+            Promise.resolve().then(() => {
+              if (drop.tileBefore.isConnected && drop.tileBefore.pinned && tab.pinned && drop.tileBefore !== tab) {
+                gBrowser.moveTabBefore(tab, drop.tileBefore);
+              }
+            });
           }
-          // again once LibreWolf is done with the drop: it moves the tab
-          // itself after unpinning it (into a folder only we know about)
-          Promise.resolve().then(() => tab.isConnected && !tab.pinned && placeAt(tab, drop.y, drop.moving));
-        }
+        });
+        gBrowser.tabContainer.addEventListener("TabUnpinned", e => {
+          const drop = pendingDrop;
+          if (drop?.wasTile.includes(e.target)) {
+            const tab = e.target;
+            placeAt(tab, drop.y, drop.moving);
+            if (drop.toRow) {
+              setRow(tab, true);
+            }
+            // again once LibreWolf is done with the drop: it moves the tab
+            // itself after unpinning it (into a folder only we know about)
+            Promise.resolve().then(() => tab.isConnected && !tab.pinned && placeAt(tab, drop.y, drop.moving));
+          }
+        });
       });
       const finishDrop = ({ moving, y, limit }) => {
         pendingDrop = null;
@@ -1682,185 +1735,188 @@ try {
         }
         normalize();
       };
-      gBrowser.tabContainer.addEventListener("dragstart", e => {
-        // (the target can be a text node, e.g. a folder's name)
-        const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
-        const els = movables();
-        startMids = els.map(el => ({ tab: el, mid: (r => r.top + r.height / 2)(el.getBoundingClientRect()) }));
-        const box = periphery?.getBoundingClientRect();
-        slotHeight = unpinned()[0]?.getBoundingClientRect().height || 0;
-        // the list ends after the last tab, and a dragged row may always go
-        // one slot below + New Tab
-        listEndScreenY = Math.max(...els.map(el => el.getBoundingClientRect().bottom), box ? box.bottom + slotHeight : 0) + win.mozInnerScreenY;
-        // a folder never leaves the pinned block: its drag ends at the block's end
-        const folderLabel = target?.closest(".tab-group-label-container");
-        folderSlot = 0;
-        newTabTop = null;
-        if (folderLabel) {
-          // it's lifted out of the layout while dragged: + New Tab keeps its place
-          const cs = win.getComputedStyle(folderLabel);
-          folderSlot = folderLabel.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
-          // LibreWolf folds the folder up while it's dragged: + New Tab and
-          // what's below keep their place (the space is held, see dragover)
-          const group = folderLabel.closest("tab-group");
-          newTabTop = periphery?.getBoundingClientRect().top ?? null;
-          dragRoot.setAttribute("arc-folder-drag", "");
-          const blockEls = els.filter(el => inBlockEl(el) && (el === folderLabel || !group.contains(el)));
-          listEndScreenY = Math.max(...blockEls.map(el => el.getBoundingClientRect().bottom)) + win.mozInnerScreenY;
-        }
-        dragRoot.setAttribute("arc-dragging", "");
-        // no tab preview card hanging around during the drag
-        try {
-          gBrowser.tabContainer.previewPanel?.forceReset?.();
-        } catch {}
-        // the first row's slot: right above the divider gap (the end-of-list
-        // box's top margin in userChrome.css), the line in its middle
-        const gap = periphery ? parseFloat(win.getComputedStyle(periphery).marginTop) || 0 : 0;
-        firstSlotTop = box ? box.top - gap : null;
-        const draggedTab = target?.closest(".tabbrowser-tab");
-        // a dragged row leaves a gap above + New Tab: keep the button in place
-        if (draggedTab && isRow(draggedTab)) {
-          periphery?.style.setProperty("--arc-newtab-shift", `${slotHeight}px`);
-        }
-        const first = listItems()[0];
-        if (!listItems().some(inBlock) && draggedTab && draggedTab === first) {
-          // no rows yet and the first tab itself is dragged (LibreWolf can't
-          // move it any higher): nudging it up is enough
-          dividerY = startMids.find(m => m.tab === draggedTab).mid - 6;
-        } else {
-          dividerY = box ? box.top - gap / 2 - 1 : null; // the line
-        }
-      }, true);
-      gBrowser.tabContainer.addEventListener("drop", e => {
-        const dt = e.dataTransfer;
-        if (dt?.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
-          return;
-        }
-        const dragged = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-        glide();
-        // A split view: dropped above the line, its pages become pinned rows
-        // (one that has a row already stays as it is); below it, normal tabs
-        if (isSplit(dragged) && gBrowser.splitViews.includes(dragged)) {
-          const toRow = !isOverTiles(e.clientY) && headsForRow(e.clientY);
-          if (!toRow || !hasRow(dragged)) {
-            for (const tab of dragged.tabs) {
-              if (isRow(tab) !== toRow) {
-                setRow(tab, toRow);
+      guard("drag and drop", () => {
+        gBrowser.tabContainer.addEventListener("dragstart", e => {
+          // (the target can be a text node, e.g. a folder's name)
+          const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+          const els = movables();
+          startMids = els.map(el => ({ tab: el, mid: (r => r.top + r.height / 2)(el.getBoundingClientRect()) }));
+          const box = periphery?.getBoundingClientRect();
+          slotHeight = unpinned()[0]?.getBoundingClientRect().height || 0;
+          // the list ends after the last tab, and a dragged row may always go
+          // one slot below + New Tab
+          listEndScreenY = Math.max(...els.map(el => el.getBoundingClientRect().bottom), box ? box.bottom + slotHeight : 0) + win.mozInnerScreenY;
+          // a folder never leaves the pinned block: its drag ends at the block's end
+          const folderLabel = target?.closest(".tab-group-label-container");
+          folderSlot = 0;
+          newTabTop = null;
+          if (folderLabel) {
+            // it's lifted out of the layout while dragged: + New Tab keeps its place
+            const cs = win.getComputedStyle(folderLabel);
+            folderSlot = folderLabel.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+            // LibreWolf folds the folder up while it's dragged: + New Tab and
+            // what's below keep their place (the space is held, see dragover)
+            const group = folderLabel.closest("tab-group");
+            newTabTop = periphery?.getBoundingClientRect().top ?? null;
+            dragRoot.setAttribute("arc-folder-drag", "");
+            const blockEls = els.filter(el => inBlockEl(el) && (el === folderLabel || !group.contains(el)));
+            listEndScreenY = Math.max(...blockEls.map(el => el.getBoundingClientRect().bottom)) + win.mozInnerScreenY;
+          }
+          dragRoot.setAttribute("arc-dragging", "");
+          // no tab preview card hanging around during the drag
+          try {
+            gBrowser.tabContainer.previewPanel?.forceReset?.();
+          } catch {}
+          // the first row's slot: right above the divider gap (the end-of-list
+          // box's top margin in userChrome.css), the line in its middle
+          const gap = periphery ? parseFloat(win.getComputedStyle(periphery).marginTop) || 0 : 0;
+          firstSlotTop = box ? box.top - gap : null;
+          const draggedTab = target?.closest(".tabbrowser-tab");
+          // a dragged row leaves a gap above + New Tab: keep the button in place
+          if (draggedTab && isRow(draggedTab)) {
+            periphery?.style.setProperty("--arc-newtab-shift", `${slotHeight}px`);
+          }
+          const first = listItems()[0];
+          if (!listItems().some(inBlock) && draggedTab && draggedTab === first) {
+            // no rows yet and the first tab itself is dragged (LibreWolf can't
+            // move it any higher): nudging it up is enough
+            dividerY = startMids.find(m => m.tab === draggedTab).mid - 6;
+          } else {
+            dividerY = box ? box.top - gap / 2 - 1 : null; // the line
+          }
+        }, true);
+        gBrowser.tabContainer.addEventListener("drop", e => {
+          const dt = e.dataTransfer;
+          if (dt?.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
+            return;
+          }
+          const dragged = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+          glide();
+          // A split view: dropped above the line, its pages become pinned rows
+          // (one that has a row already stays as it is); below it, normal tabs
+          if (isSplit(dragged) && gBrowser.splitViews.includes(dragged)) {
+            const toRow = !isOverTiles(e.clientY) && headsForRow(e.clientY);
+            if (!toRow || !hasRow(dragged)) {
+              for (const tab of dragged.tabs) {
+                if (isRow(tab) !== toRow) {
+                  setRow(tab, toRow);
+                }
               }
             }
+            return;
           }
-          return;
-        }
-        // (not ownerGlobal === win: here win is a cross-compartment wrapper)
-        if (!gBrowser.tabs.includes(dragged)) {
-          return;
-        }
-        const moving = dragged.multiselected ? [...gBrowser.selectedTabs] : [dragged];
-        const y = e.clientY;
-        const limit = dividerY;
-        // over the tiles: the tile it goes before (null: the end)
-        let tileBefore;
-        if (isOverTiles(y) && moving.some(t => !t.pinned)) {
-          tileBefore = cells()[tileSlot(e.clientX, y)]?.tile ?? null;
-        }
-        // Mark it right away, as the cue showed (rows sort above + New Tab, so
-        // a late mark would make it jump); finishDrop double-checks
-        const toRow = headsForRow(y);
-        for (const tab of moving) {
-          if (!tab.pinned && isRow(tab) !== toRow) {
-            setRow(tab, toRow);
+          // (not ownerGlobal === win: here win is a cross-compartment wrapper)
+          if (!gBrowser.tabs.includes(dragged)) {
+            return;
           }
-        }
-        const drop = { moving, y, limit, toRow, wasTile: moving.filter(t => t.pinned), tileBefore };
-        pendingDrop = drop;
-        win.setTimeout(() => finishDrop(drop), 400);
-      }, true);
+          const moving = dragged.multiselected ? [...gBrowser.selectedTabs] : [dragged];
+          const y = e.clientY;
+          const limit = dividerY;
+          // over the tiles: the tile it goes before (null: the end)
+          let tileBefore;
+          if (isOverTiles(y) && moving.some(t => !t.pinned)) {
+            tileBefore = cells()[tileSlot(e.clientX, y)]?.tile ?? null;
+          }
+          // Mark it right away, as the cue showed (rows sort above + New Tab, so
+          // a late mark would make it jump); finishDrop double-checks
+          const toRow = headsForRow(y);
+          for (const tab of moving) {
+            if (!tab.pinned && isRow(tab) !== toRow) {
+              setRow(tab, toRow);
+            }
+          }
+          const drop = { moving, y, limit, toRow, wasTile: moving.filter(t => t.pinned), tileBefore };
+          pendingDrop = drop;
+          win.setTimeout(() => finishDrop(drop), 400);
+        }, true);
+      });
       // No extra macOS drag preview (the big page thumbnail): the dragged tab
       // itself follows the pointer, as in Arc and Safari
       const blankDragImage = new win.Image();
       blankDragImage.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-      gBrowser.tabContainer.addEventListener("dragstart", e => {
-        if (e.dataTransfer?.mozTypesAt(0)?.[0] === TAB_DROP_TYPE) {
-          e.dataTransfer.setDragImage(blankDragImage, 0, 0);
-        }
+      guard("drag and drop: no page thumbnail", () => {
+        gBrowser.tabContainer.addEventListener("dragstart", e => {
+          if (e.dataTransfer?.mozTypesAt(0)?.[0] === TAB_DROP_TYPE) {
+            e.dataTransfer.setDragImage(blankDragImage, 0, 0);
+          }
+        });
       });
       // On macOS LibreWolf swaps in a page thumbnail once it's captured
       // (updateDragImage); ignore that for tab drags
-      const updateDragImage = win.DataTransfer.prototype.updateDragImage;
-      if (updateDragImage) {
-        win.DataTransfer.prototype.updateDragImage = function (...args) {
-          if (this.mozTypesAt?.(0)?.[0] === TAB_DROP_TYPE) {
-            return undefined;
+      const noThumbnailForTabs = original => function (...args) {
+        if (this.mozTypesAt?.(0)?.[0] === TAB_DROP_TYPE) {
+          return undefined;
+        }
+        return original.apply(this, args);
+      };
+      guard("drag and drop: cues", () => {
+        // While a dragged tab is over the tiles, show it as a tile
+        // ([arc-drag-over-tiles] + --arc-drag-x, styled in userChrome.css)
+        gBrowser.tabContainer.addEventListener("dragover", e => {
+          if (e.dataTransfer?.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
+            return;
           }
-          return updateDragImage.apply(this, args);
-        };
-      }
-      // While a dragged tab is over the tiles, show it as a tile
-      // ([arc-drag-over-tiles] + --arc-drag-x, styled in userChrome.css)
-      gBrowser.tabContainer.addEventListener("dragover", e => {
-        if (e.dataTransfer?.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
-          return;
-        }
-        const r = tilesBox();
-        const over = isOverTiles(e.clientY, r);
-        dragRoot.toggleAttribute("arc-drag-over-tiles", over);
-        if (over) {
-          dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - r.left}px`);
-        }
-        const draggedItem = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]");
-        // a tab (not a tile) over the tiles: they make room; the rows stay put
-        const tabOverTiles = over && !!draggedItem && !draggedItem.pinned;
-        dragRoot.toggleAttribute("arc-tab-over-tiles", tabOverTiles);
-        if (tabOverTiles) {
-          openTileGap(tileSlot(e.clientX, e.clientY));
-        } else {
-          closeTileGap();
-        }
-        // a folder being dragged: the space it left (its name lifted out,
-        // its tabs folded up) is held, so + New Tab stays where it was
-        if (folderSlot && newTabTop !== null && periphery) {
-          const held = parseFloat(periphery.style.getPropertyValue("--arc-folder-space")) || 0;
-          const drift = newTabTop - (periphery.getBoundingClientRect().top - held);
-          periphery.style.setProperty("--arc-folder-space", `${Math.max(0, drift)}px`);
-        }
-        // A tile dragged below the grid lines up with the rows
-        const tab = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget][pinned]");
-        const ref = unpinned()[0];
-        const overRows = !!tab && !!ref && !!r && e.clientY > r.bottom + 4;
-        dragRoot.toggleAttribute("arc-drag-over-rows", overRows);
-        if (overRows) {
-          const shift = parseFloat(dragRoot.style.getPropertyValue("--arc-row-dx")) || 0;
-          const refBox = ref.getBoundingClientRect();
-          dragRoot.style.setProperty("--arc-row-w", `${refBox.width}px`);
-          dragRoot.style.setProperty("--arc-row-dx", `${refBox.left - (tab.getBoundingClientRect().left - shift)}px`);
-        } else {
-          dragRoot.style.removeProperty("--arc-row-dx");
-        }
-        // ...and the tabs below the pointer make room for it
-        for (const { tab: el, mid } of startMids) {
-          el.toggleAttribute("arc-make-room", overRows && mid > e.clientY);
-        }
-        // Show while dragging whether the drop makes a pinned row (a folder
-        // always stays pinned: no cue)
-        const toRow = !folderSlot && headsForRow(e.clientY);
-        dragRoot.toggleAttribute("arc-drop-row", toRow);
-        // + New Tab follows the rows: as far as LibreWolf has moved the last
-        // one, and a slot down while the dragged tab is headed for them
-        const rows = movables().filter(el => inBlockEl(el) && !el.hasAttribute("dragtarget"));
-        const shift = folderSlot || tabOverTiles ? 0 : Math.max(rows.length ? shiftOf(rows.at(-1)) : 0, toRow ? slotHeight : 0);
-        periphery?.style.setProperty("--arc-newtab-shift", `${shift}px`);
-        // With no rows yet, the tab snaps into the first row's slot (where
-        // + New Tab was), the line and + New Tab moving down below it
-        const dragged = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]");
-        const snap = toRow && !rows.length && firstSlotTop !== null && dragged && !dragged.pinned;
-        dragRoot.toggleAttribute("arc-snap-row", !!snap);
-        if (snap) {
-          const current = parseFloat(dragRoot.style.getPropertyValue("--arc-snap-dy")) || 0;
-          dragRoot.style.setProperty("--arc-snap-dy", `${firstSlotTop - (dragged.getBoundingClientRect().top - current)}px`);
-        } else {
-          dragRoot.style.removeProperty("--arc-snap-dy");
-        }
-      }, true);
+          const r = tilesBox();
+          const over = isOverTiles(e.clientY, r);
+          dragRoot.toggleAttribute("arc-drag-over-tiles", over);
+          if (over) {
+            dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - r.left}px`);
+          }
+          const draggedItem = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]");
+          // a tab (not a tile) over the tiles: they make room; the rows stay put
+          const tabOverTiles = over && !!draggedItem && !draggedItem.pinned;
+          dragRoot.toggleAttribute("arc-tab-over-tiles", tabOverTiles);
+          if (tabOverTiles) {
+            openTileGap(tileSlot(e.clientX, e.clientY));
+          } else {
+            closeTileGap();
+          }
+          // a folder being dragged: the space it left (its name lifted out,
+          // its tabs folded up) is held, so + New Tab stays where it was
+          if (folderSlot && newTabTop !== null && periphery) {
+            const held = parseFloat(periphery.style.getPropertyValue("--arc-folder-space")) || 0;
+            const drift = newTabTop - (periphery.getBoundingClientRect().top - held);
+            periphery.style.setProperty("--arc-folder-space", `${Math.max(0, drift)}px`);
+          }
+          // A tile dragged below the grid lines up with the rows
+          const tab = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget][pinned]");
+          const ref = unpinned()[0];
+          const overRows = !!tab && !!ref && !!r && e.clientY > r.bottom + 4;
+          dragRoot.toggleAttribute("arc-drag-over-rows", overRows);
+          if (overRows) {
+            const shift = parseFloat(dragRoot.style.getPropertyValue("--arc-row-dx")) || 0;
+            const refBox = ref.getBoundingClientRect();
+            dragRoot.style.setProperty("--arc-row-w", `${refBox.width}px`);
+            dragRoot.style.setProperty("--arc-row-dx", `${refBox.left - (tab.getBoundingClientRect().left - shift)}px`);
+          } else {
+            dragRoot.style.removeProperty("--arc-row-dx");
+          }
+          // ...and the tabs below the pointer make room for it
+          for (const { tab: el, mid } of startMids) {
+            el.toggleAttribute("arc-make-room", overRows && mid > e.clientY);
+          }
+          // Show while dragging whether the drop makes a pinned row (a folder
+          // always stays pinned: no cue)
+          const toRow = !folderSlot && headsForRow(e.clientY);
+          dragRoot.toggleAttribute("arc-drop-row", toRow);
+          // + New Tab follows the rows: as far as LibreWolf has moved the last
+          // one, and a slot down while the dragged tab is headed for them
+          const rows = movables().filter(el => inBlockEl(el) && !el.hasAttribute("dragtarget"));
+          const shift = folderSlot || tabOverTiles ? 0 : Math.max(rows.length ? shiftOf(rows.at(-1)) : 0, toRow ? slotHeight : 0);
+          periphery?.style.setProperty("--arc-newtab-shift", `${shift}px`);
+          // With no rows yet, the tab snaps into the first row's slot (where
+          // + New Tab was), the line and + New Tab moving down below it
+          const dragged = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]");
+          const snap = toRow && !rows.length && firstSlotTop !== null && dragged && !dragged.pinned;
+          dragRoot.toggleAttribute("arc-snap-row", !!snap);
+          if (snap) {
+            const current = parseFloat(dragRoot.style.getPropertyValue("--arc-snap-dy")) || 0;
+            dragRoot.style.setProperty("--arc-snap-dy", `${firstSlotTop - (dragged.getBoundingClientRect().top - current)}px`);
+          } else {
+            dragRoot.style.removeProperty("--arc-snap-dy");
+          }
+        }, true);
+      });
       let quietPreviewsUntil = 0;
       const endDrag = () => {
         quietPreviewsUntil = win.performance.now() + 1000;
@@ -1883,37 +1939,36 @@ try {
         // e.g. a folder dragged below the line goes back to the pinned block
         win.setTimeout(normalize, 450);
       };
-      gBrowser.tabContainer.addEventListener("dragend", endDrag, true);
-      // Tab preview cards: none while dragging, nor right after a drop (the
-      // pointer comes to rest on a tab)
-      const previews = gBrowser.tabContainer.previewPanel;
-      if (previews?.shouldActivate) {
-        const shouldActivate = previews.shouldActivate.bind(previews);
-        previews.shouldActivate = () =>
-          !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && shouldActivate();
-      }
-      gBrowser.tabContainer.addEventListener("drop", endDrag, true);
-      // Leaving the sidebar doesn't end the drag (it may come back, e.g.
-      // after a detour over the page): only the cues that follow the pointer
-      // go; LibreWolf keeps everything else as it was until the drop
-      gBrowser.tabContainer.addEventListener("dragleave", e => {
-        if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
-          closeTileGap();
-          for (const name of ["arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-snap-row"]) {
-            dragRoot.removeAttribute(name);
+      guard("drag and drop: ending", () => {
+        gBrowser.tabContainer.addEventListener("dragend", endDrag, true);
+        // Tab preview cards: none while dragging, nor right after a drop (the
+        // pointer comes to rest on a tab)
+        const noPreviewsWhileDragging = original => function () {
+          return !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && original.call(this);
+        };
+        gBrowser.tabContainer.addEventListener("drop", endDrag, true);
+        // Leaving the sidebar doesn't end the drag (it may come back, e.g.
+        // after a detour over the page): only the cues that follow the pointer
+        // go; LibreWolf keeps everything else as it was until the drop
+        gBrowser.tabContainer.addEventListener("dragleave", e => {
+          if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
+            closeTileGap();
+            for (const name of ["arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-snap-row"]) {
+              dragRoot.removeAttribute(name);
+            }
+            for (const el of gBrowser.tabContainer.querySelectorAll("[arc-make-room]")) {
+              el.removeAttribute("arc-make-room");
+            }
           }
-          for (const el of gBrowser.tabContainer.querySelectorAll("[arc-make-room]")) {
-            el.removeAttribute("arc-make-room");
+        }, true);
+        // A drag that ended without reaching us (dropped outside the window,
+        // cancelled): the next click proves it's over, as LibreWolf assumes too
+        win.addEventListener("mousedown", e => {
+          if (e.button === 0 && dragRoot.hasAttribute("arc-dragging")) {
+            endDrag();
           }
-        }
-      }, true);
-      // A drag that ended without reaching us (dropped outside the window,
-      // cancelled): the next click proves it's over, as LibreWolf assumes too
-      win.addEventListener("mousedown", e => {
-        if (e.button === 0 && dragRoot.hasAttribute("arc-dragging")) {
-          endDrag();
-        }
-      }, true);
+        }, true);
+      });
 
       // --- split view by drag and drop (as in Arc) ---
       // Dragging a tab over the page shows two drop zones (#arc-split-drop,
@@ -1922,214 +1977,218 @@ try {
       // split view. Normal tabs and pinned rows (a split view with a row sits
       // in the row's spot, see isSplit); not tiles: LibreWolf keeps its pinned
       // tabs out of split views. A tab can come from another window too.
-      const splitDrop = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
-      splitDrop.id = "arc-split-drop";
-      for (const side of ["left", "right"]) {
-        const zone = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
-        zone.setAttribute("side", side);
-        splitDrop.append(zone);
-      }
-      doc.body.append(splitDrop);
-      // Pressing on a tab already selects it, so the page shown before the
-      // press is the one to split with: it comes back under the drop zones
-      // when the drag reaches the page, and a drag dropped elsewhere leaves
-      // the dragged tab selected, as without split view.
-      let splitDragged = null;
-      let splitPartner = null;
-      let splitForeign = false; // dragged from another window
-      let beforePress = null;
-      const canSplit = tab => !!tab && !tab.pinned && !tab.splitview && !tab.closing &&
-        !tab.hasAttribute("arc-start-page");
-      const showSplitDrop = (dragged, partner, foreign) => {
-        // over the page, but not over the sidebar floating above it
-        const page = doc.getElementById("tabbrowser-tabbox").getBoundingClientRect();
-        const sidebarBox = doc.querySelector("sidebar-main").getBoundingClientRect();
-        const left = Math.max(page.left, sidebarBox.width > 100 ? sidebarBox.right : 0);
-        Object.assign(splitDrop.style, {
-          left: `${left}px`,
-          top: `${page.top}px`,
-          width: `${page.right - left}px`,
-          height: `${page.height}px`,
+      const splitView = guard("split view", () => {
+        const splitDrop = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+        splitDrop.id = "arc-split-drop";
+        for (const side of ["left", "right"]) {
+          const zone = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+          zone.setAttribute("side", side);
+          splitDrop.append(zone);
+        }
+        doc.body.append(splitDrop);
+        // Pressing on a tab already selects it, so the page shown before the
+        // press is the one to split with: it comes back under the drop zones
+        // when the drag reaches the page, and a drag dropped elsewhere leaves
+        // the dragged tab selected, as without split view.
+        let splitDragged = null;
+        let splitPartner = null;
+        let splitForeign = false; // dragged from another window
+        let beforePress = null;
+        const canSplit = tab => !!tab && !tab.pinned && !tab.splitview && !tab.closing &&
+          !tab.hasAttribute("arc-start-page");
+        const showSplitDrop = (dragged, partner, foreign) => {
+          // over the page, but not over the sidebar floating above it
+          const page = doc.getElementById("tabbrowser-tabbox").getBoundingClientRect();
+          const sidebarBox = doc.querySelector("sidebar-main").getBoundingClientRect();
+          const left = Math.max(page.left, sidebarBox.width > 100 ? sidebarBox.right : 0);
+          Object.assign(splitDrop.style, {
+            left: `${left}px`,
+            top: `${page.top}px`,
+            width: `${page.right - left}px`,
+            height: `${page.height}px`,
+          });
+          splitDragged = dragged;
+          splitPartner = partner;
+          splitForeign = foreign;
+          if (dragged) {
+            splitDrop.setAttribute("active", "");
+          }
+        };
+        const hideSplitDrop = () => {
+          splitDrop.removeAttribute("active");
+          splitDrop.removeAttribute("catch");
+          splitDrop.removeAttribute("side");
+          if (splitDragged && !splitForeign && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
+            gBrowser.selectedTab = splitDragged;
+          }
+          splitDragged = splitPartner = null;
+          splitForeign = false;
+        };
+        gBrowser.tabContainer.addEventListener("mousedown", e => {
+          if (e.button === 0) {
+            beforePress = gBrowser.selectedTab;
+          }
+        }, true);
+        gBrowser.tabContainer.addEventListener("dragstart", e => {
+          const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
+          const tab = target?.closest(".tabbrowser-tab");
+          const partner = tab === gBrowser.selectedTab ? beforePress : gBrowser.selectedTab;
+          beforePress = null;
+          if (partner && partner !== tab && canSplit(tab) && canSplit(partner)) {
+            showSplitDrop(tab, partner, false);
+          } else {
+            // No split possible (or a folder, a split pair): the page still takes the drop and does nothing
+            // with it (LibreWolf would tear the tab off into a new window when
+            // it's dropped anywhere past the sidebar; as in Arc and Safari, only
+            // a drop outside the window does)
+            showSplitDrop(null, null, false);
+            splitDrop.setAttribute("catch", "");
+          }
         });
-        splitDragged = dragged;
-        splitPartner = partner;
-        splitForeign = foreign;
-        if (dragged) {
-          splitDrop.setAttribute("active", "");
-        }
-      };
-      const hideSplitDrop = () => {
-        splitDrop.removeAttribute("active");
-        splitDrop.removeAttribute("catch");
-        splitDrop.removeAttribute("side");
-        if (splitDragged && !splitForeign && gBrowser.selectedTab === splitPartner && !splitDragged.closing) {
-          gBrowser.selectedTab = splitDragged;
-        }
-        splitDragged = splitPartner = null;
-        splitForeign = false;
-      };
-      gBrowser.tabContainer.addEventListener("mousedown", e => {
-        if (e.button === 0) {
-          beforePress = gBrowser.selectedTab;
-        }
-      }, true);
-      gBrowser.tabContainer.addEventListener("dragstart", e => {
-        const target = e.target?.nodeType === 1 ? e.target : e.target?.parentElement;
-        const tab = target?.closest(".tabbrowser-tab");
-        const partner = tab === gBrowser.selectedTab ? beforePress : gBrowser.selectedTab;
-        beforePress = null;
-        if (partner && partner !== tab && canSplit(tab) && canSplit(partner)) {
-          showSplitDrop(tab, partner, false);
-        } else {
-          // No split possible (or a folder, a split pair): the page still takes the drop and does nothing
-          // with it (LibreWolf would tear the tab off into a new window when
-          // it's dropped anywhere past the sidebar; as in Arc and Safari, only
-          // a drop outside the window does)
-          showSplitDrop(null, null, false);
-          splitDrop.setAttribute("catch", "");
-        }
-      });
-      // A tab dragged in from another window: the zones show once the drag
-      // is over this window. A row there is a row here too (this window's own
-      // copy is used); a normal tab moves over.
-      const foreignDrag = e => {
-        const dt = e.dataTransfer;
-        if (splitDragged || splitDrop.hasAttribute("catch") || dt?.mozTypesAt(0)?.[0] !== TAB_DROP_TYPE) {
-          return;
-        }
-        let tab = null;
-        try {
-          tab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-        } catch {}
-        if (!tab || gBrowser.tabs.includes(tab) || !canSplit(tab) || !canSplit(gBrowser.selectedTab)) {
-          return;
-        }
-        if (isRow(tab)) {
-          const own = findItem(tab.getAttribute(ITEM_ID));
-          if (!own || own === gBrowser.selectedTab || !canSplit(own)) {
+        // A tab dragged in from another window: the zones show once the drag
+        // is over this window. A row there is a row here too (this window's own
+        // copy is used); a normal tab moves over.
+        const foreignDrag = e => {
+          const dt = e.dataTransfer;
+          if (splitDragged || splitDrop.hasAttribute("catch") || dt?.mozTypesAt(0)?.[0] !== TAB_DROP_TYPE) {
             return;
           }
-        }
-        showSplitDrop(tab, gBrowser.selectedTab, true);
-      };
-      win.addEventListener("dragenter", foreignDrag, true);
-      win.addEventListener("dragover", foreignDrag, true);
-      win.addEventListener("dragleave", e => {
-        // (the drag left the window; dragend only reaches the window it
-        // started in)
-        if (splitForeign && !e.relatedTarget) {
-          hideSplitDrop();
-        }
-      }, true);
-      splitDrop.addEventListener("dragover", e => {
-        if (!splitDragged) {
-          if (splitDrop.hasAttribute("catch")) {
-            e.preventDefault();
-            if (e.dataTransfer) {
-              e.dataTransfer.dropEffect = "move";
+          let tab = null;
+          try {
+            tab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+          } catch {}
+          if (!tab || gBrowser.tabs.includes(tab) || !canSplit(tab) || !canSplit(gBrowser.selectedTab)) {
+            return;
+          }
+          if (isRow(tab)) {
+            const own = findItem(tab.getAttribute(ITEM_ID));
+            if (!own || own === gBrowser.selectedTab || !canSplit(own)) {
+              return;
             }
           }
-          return;
-        }
-        e.preventDefault();
-        if (e.dataTransfer) {
-          e.dataTransfer.dropEffect = "move";
-        }
-        if (gBrowser.selectedTab !== splitPartner) {
-          gBrowser.selectedTab = splitPartner;
-        }
-        const box = splitDrop.getBoundingClientRect();
-        splitDrop.setAttribute("side", e.clientX < box.left + box.width / 2 ? "left" : "right");
-      });
-      splitDrop.addEventListener("dragleave", e => {
-        if (!splitDrop.contains(e.relatedTarget)) {
-          splitDrop.removeAttribute("side");
-        }
-      });
-      splitDrop.addEventListener("drop", e => {
-        let dragged = splitDragged;
-        const partner = splitPartner;
-        const foreign = splitForeign;
-        if (!dragged) {
-          if (splitDrop.hasAttribute("catch")) {
-            e.preventDefault();
-            e.stopPropagation();
+          showSplitDrop(tab, gBrowser.selectedTab, true);
+        };
+        win.addEventListener("dragenter", foreignDrag, true);
+        win.addEventListener("dragover", foreignDrag, true);
+        win.addEventListener("dragleave", e => {
+          // (the drag left the window; dragend only reaches the window it
+          // started in)
+          if (splitForeign && !e.relatedTarget) {
             hideSplitDrop();
           }
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        const onLeft = splitDrop.getAttribute("side") === "left";
-        splitDragged = splitPartner = null;
-        hideSplitDrop();
-        try {
-          if (foreign) {
-            dragged = isRow(dragged)
-              ? findItem(dragged.getAttribute(ITEM_ID))
-              : gBrowser.adoptTab(dragged, { tabIndex: gBrowser.tabs.length, selectTab: false });
+        }, true);
+        splitDrop.addEventListener("dragover", e => {
+          if (!splitDragged) {
+            if (splitDrop.hasAttribute("catch")) {
+              e.preventDefault();
+              if (e.dataTransfer) {
+                e.dataTransfer.dropEffect = "move";
+              }
+            }
+            return;
           }
-          if (canSplit(dragged) && canSplit(partner) && dragged !== partner) {
-            gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
-            gBrowser.selectedTab = dragged;
-            // LibreWolf clears the offset a dragged tab follows the pointer
-            // with only from tabs outside split views
-            const tabs = [dragged, partner];
-            const clear = () => tabs.forEach(t => t.style.removeProperty("transform"));
-            win.addEventListener("dragend", () => win.setTimeout(clear, 0), { once: true, capture: true });
-            win.setTimeout(clear, 600);
+          e.preventDefault();
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = "move";
           }
-        } catch (err) {
-          console.error("Arc sidebar (split view):", err);
-        }
-      });
-      win.addEventListener("dragend", hideSplitDrop, true);
-      win.addEventListener("drop", () => win.setTimeout(() => splitForeign && hideSplitDrop(), 0), true);
-      // However a split view is made (drop, right-click menu, LibreWolf's
-      // "choose a tab" page): one with a row goes in the row's spot, and a
-      // tile is left out (LibreWolf would make a split view of one page)
-      let splitAnchor = null; // the row whose spot a new split view takes
-      const addTabSplitView = gBrowser.addTabSplitView.bind(gBrowser);
-      gBrowser.addTabSplitView = (tabs, options = {}) => {
-        const usable = (tabs || []).filter(t => !t.pinned);
-        if (tabs?.length >= 2 && usable.length < 2) {
-          return null;
-        }
-        const row = usable.filter(isRow).sort((a, b) => gBrowser.tabs.indexOf(a) - gBrowser.tabs.indexOf(b))[0];
-        splitAnchor = row ?? null;
-        try {
-          return addTabSplitView(usable, row ? { ...options, insertBefore: row } : options);
-        } finally {
-          splitAnchor = null;
-        }
-      };
-      // (LibreWolf adds the tabs one by one through this, and its "choose a
-      // tab" page through it too)
-      const moveTabToSplitView = gBrowser.moveTabToSplitView.bind(gBrowser);
-      gBrowser.moveTabToSplitView = (tab, split, ...rest) => {
-        if (tab && split && isRow(tab) && !tab.splitview) {
-          if (splitAnchor ? tab !== splitAnchor : hasRow(split)) {
-            noteOrigin(tab);
-          } else if (!splitAnchor && !split.group) {
-            // a split view of normal tabs that a row joins goes to its spot
-            try {
-              gBrowser.moveTabBefore(split, tab);
-            } catch {}
+          if (gBrowser.selectedTab !== splitPartner) {
+            gBrowser.selectedTab = splitPartner;
           }
-        }
-        return moveTabToSplitView(tab, split, ...rest);
-      };
+          const box = splitDrop.getBoundingClientRect();
+          splitDrop.setAttribute("side", e.clientX < box.left + box.width / 2 ? "left" : "right");
+        });
+        splitDrop.addEventListener("dragleave", e => {
+          if (!splitDrop.contains(e.relatedTarget)) {
+            splitDrop.removeAttribute("side");
+          }
+        });
+        splitDrop.addEventListener("drop", e => {
+          let dragged = splitDragged;
+          const partner = splitPartner;
+          const foreign = splitForeign;
+          if (!dragged) {
+            if (splitDrop.hasAttribute("catch")) {
+              e.preventDefault();
+              e.stopPropagation();
+              hideSplitDrop();
+            }
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          const onLeft = splitDrop.getAttribute("side") === "left";
+          splitDragged = splitPartner = null;
+          hideSplitDrop();
+          try {
+            if (foreign) {
+              dragged = isRow(dragged)
+                ? findItem(dragged.getAttribute(ITEM_ID))
+                : gBrowser.adoptTab(dragged, { tabIndex: gBrowser.tabs.length, selectTab: false });
+            }
+            if (canSplit(dragged) && canSplit(partner) && dragged !== partner) {
+              gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
+              gBrowser.selectedTab = dragged;
+              // LibreWolf clears the offset a dragged tab follows the pointer
+              // with only from tabs outside split views
+              const tabs = [dragged, partner];
+              const clear = () => tabs.forEach(t => t.style.removeProperty("transform"));
+              win.addEventListener("dragend", () => win.setTimeout(clear, 0), { once: true, capture: true });
+              win.setTimeout(clear, 600);
+            }
+          } catch (err) {
+            report("split view", err);
+          }
+        });
+        win.addEventListener("dragend", hideSplitDrop, true);
+        win.addEventListener("drop", () => win.setTimeout(() => splitForeign && hideSplitDrop(), 0), true);
+        // However a split view is made (drop, right-click menu, LibreWolf's
+        // "choose a tab" page): one with a row goes in the row's spot, and a
+        // tile is left out (LibreWolf would make a split view of one page)
+        // (and the two tabs, with whatever moves for them, glide into place:
+        // see "motion" above)
+        let splitAnchor = null; // the row whose spot a new split view takes
+        const inRowSpot = original => (tabs, options = {}) => {
+          const usable = (tabs || []).filter(t => !t.pinned);
+          if (tabs?.length >= 2 && usable.length < 2) {
+            return null;
+          }
+          const row = usable.filter(isRow).sort((a, b) => gBrowser.tabs.indexOf(a) - gBrowser.tabs.indexOf(b))[0];
+          splitAnchor = row ?? null;
+          const places = notePlaces();
+          try {
+            return original.call(gBrowser, usable, row ? { ...options, insertBefore: row } : options);
+          } finally {
+            splitAnchor = null;
+            glideFrom(places);
+          }
+        };
+        // (LibreWolf adds the tabs one by one through this, and its "choose a
+        // tab" page through it too)
+        const rowJoins = original => (tab, split, ...rest) => {
+          if (tab && split && isRow(tab) && !tab.splitview) {
+            if (splitAnchor ? tab !== splitAnchor : hasRow(split)) {
+              noteOrigin(tab);
+            } else if (!splitAnchor && !split.group) {
+              // a split view of normal tabs that a row joins goes to its spot
+              try {
+                gBrowser.moveTabBefore(split, tab);
+              } catch {}
+            }
+          }
+          return original.call(gBrowser, tab, split, ...rest);
+        };
+        return { inRowSpot, rowJoins };
+      }) ?? {};
 
       // --- closing a pinned row or tile resets it instead ---
       // It goes back to its pinned page, unloaded (except when its whole
       // folder is deleted: then its tabs really close)
       const closingFolderTabs = new WeakSet();
-      const removeTabGroup = gBrowser.removeTabGroup.bind(gBrowser);
-      gBrowser.removeTabGroup = (group, options) => {
+      const folderTabsReallyClose = original => (group, options) => {
         for (const tab of group.tabs) {
           closingFolderTabs.add(tab);
         }
-        return removeTabGroup(group, options);
+        return original.call(gBrowser, group, options);
       };
       // Where to go after closing a pinned row or tile: the most recently used
       // open (loaded) pinned row, else open normal tab, else the empty page
@@ -2178,70 +2237,72 @@ try {
         win.addEventListener("TabSwitchDone", run);
         win.setTimeout(run, 1000);
       };
-      const removeTab = gBrowser.removeTab.bind(gBrowser);
-      gBrowser.removeTab = (tab, options) => {
-        // The empty page (no tab open) has nothing to close: Cmd+W there would
-        // let LibreWolf go to the tab next to it, often an unloaded pinned
-        // row, and load it. It stays (the script removes it itself once
-        // another tab is selected, while it's no longer the selected one).
-        if (tab?.selected && tab.hasAttribute("arc-start-page")) {
-          gBrowser.selectedBrowser.focus(); // closes the floating URL bar
-          return undefined;
-        }
-        // Closing the last normal tab: LibreWolf would go to the tab next to
-        // it, often an unloaded pinned row, and load it. Go where closing a
-        // pinned row goes instead (an open row, else the empty page with the
-        // floating URL bar). With other normal tabs open, LibreWolf decides.
-        if (tab?.selected && !isPinnedish(tab) && !tab.hasAttribute("arc-start-page") &&
-            !gBrowser.tabs.some(t => t !== tab && !t.closing && !t.hidden && !isPinnedish(t) && !t.hasAttribute("arc-start-page"))) {
-          gBrowser.selectedTab = nextAfterClose(tab);
-        }
-        // closing one half of a split view shows the other one
-        const otherHalf = tab?.selected && tab.splitview?.tabs.find(t => t !== tab && !t.closing);
-        if (!tab || !isPinnedish(tab) || closingFolderTabs.has(tab)) {
-          if (otherHalf && !otherHalf.pinned) {
-            gBrowser.selectedTab = otherHalf;
+      // (Closing the Peek's tab closes the Peek first, see "Peek" below. The
+      // rest is this, which the Peek uses to close its own tab.)
+      let closeOrReset = (tab, options) => gBrowser.removeTab(tab, options);
+      const resetInsteadOfClosing = original => {
+        const removeTab = (tab, options) => original.call(gBrowser, tab, options);
+        closeOrReset = (tab, options) => {
+          // The empty page (no tab open) has nothing to close: Cmd+W there would
+          // let LibreWolf go to the tab next to it, often an unloaded pinned
+          // row, and load it. It stays (the script removes it itself once
+          // another tab is selected, while it's no longer the selected one).
+          if (tab?.selected && tab.hasAttribute("arc-start-page")) {
+            gBrowser.selectedBrowser.focus(); // closes the floating URL bar
+            return undefined;
           }
-          return removeTab(tab, options);
-        }
-        // A row in a split view leaves it first (the other page stays open,
-        // full width) and is reset in its own spot
-        if (tab.splitview) {
-          const others = tab.splitview.tabs.filter(t => t !== tab);
-          const selected = tab.selected;
-          separate(tab.splitview);
-          const next = others.find(t => t.isConnected && !t.closing);
-          if (selected) {
+          // Closing the last normal tab: LibreWolf would go to the tab next to
+          // it, often an unloaded pinned row, and load it. Go where closing a
+          // pinned row goes instead (an open row, else the empty page with the
+          // floating URL bar). With other normal tabs open, LibreWolf decides.
+          if (tab?.selected && !isPinnedish(tab) && !tab.hasAttribute("arc-start-page") &&
+              !gBrowser.tabs.some(t => t !== tab && !t.closing && !t.hidden && !isPinnedish(t) && !t.hasAttribute("arc-start-page"))) {
+            gBrowser.selectedTab = nextAfterClose(tab);
+          }
+          // closing one half of a split view shows the other one
+          const otherHalf = tab?.selected && tab.splitview?.tabs.find(t => t !== tab && !t.closing);
+          if (!tab || !isPinnedish(tab) || closingFolderTabs.has(tab)) {
+            if (otherHalf && !otherHalf.pinned) {
+              gBrowser.selectedTab = otherHalf;
+            }
+            return removeTab(tab, options);
+          }
+          // A row in a split view leaves it first (the other page stays open,
+          // full width) and is reset in its own spot
+          if (tab.splitview) {
+            const others = tab.splitview.tabs.filter(t => t !== tab);
+            const selected = tab.selected;
+            separate(tab.splitview);
+            const next = others.find(t => t.isConnected && !t.closing);
+            if (selected) {
+              whenSwitched(() => resetClosed(tab));
+              gBrowser.selectedTab = next || nextAfterClose(tab);
+            } else {
+              resetClosed(tab);
+            }
+            return undefined;
+          }
+          if (tab.selected) {
             whenSwitched(() => resetClosed(tab));
-            gBrowser.selectedTab = next || nextAfterClose(tab);
+            gBrowser.selectedTab = nextAfterClose(tab);
           } else {
             resetClosed(tab);
           }
           return undefined;
-        }
-        if (tab.selected) {
-          whenSwitched(() => resetClosed(tab));
-          gBrowser.selectedTab = nextAfterClose(tab);
-        } else {
-          resetClosed(tab);
-        }
-        return undefined;
+        };
+        return (tab, options) => (peekSection.peekCloses?.(tab) ? undefined : closeOrReset(tab, options));
       };
 
       // Cmd+W on a tile: LibreWolf never closes a tile from the keyboard (it
       // just jumps to the first unpinned tab); here it closes like a pinned
       // row does (reset, unloaded) and goes where nextAfterClose says
-      const commands = win.BrowserCommands;
-      const closeTabOrWindow = commands?.closeTabOrWindow;
-      if (closeTabOrWindow) {
-        commands.closeTabOrWindow = function (event) {
-          if (!gBrowser.multiSelectedTabsCount && gBrowser.selectedTab.pinned) {
-            gBrowser.removeTab(gBrowser.selectedTab);
-            return;
-          }
-          return closeTabOrWindow.call(this, event);
-        };
-      }
+      const closeTilesToo = original => function (event) {
+        if (!gBrowser.multiSelectedTabsCount && gBrowser.selectedTab.pinned) {
+          gBrowser.removeTab(gBrowser.selectedTab);
+          return undefined;
+        }
+        return original.call(this, event);
+      };
 
       // --- Peek (as in Arc) ---
       // A link to another site clicked in a tile or a pinned row opens in a
@@ -2254,308 +2315,311 @@ try {
       // card's close button or switching tabs closes it (and it's gone, in
       // Recently Closed); it can also become a normal tab, or a split view
       // with a pinned row.
-      const PEEK = "arc-peek-tab";
-      const setAppTab = tab => {
-        try {
-          if (tab.linkedBrowser?.browsingContext) {
-            tab.linkedBrowser.browsingContext.isAppTab = tab.pinned || isRow(tab);
-          }
-        } catch {}
-      };
-      for (const tab of gBrowser.tabs) {
-        setAppTab(tab);
-      }
-      gBrowser.tabContainer.addEventListener("TabBrowserInserted", e => setAppTab(e.target));
-      gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
-        if (e.detail?.changed?.includes(ROW)) {
-          setAppTab(e.target);
-        }
-      });
-      new win.MutationObserver(records => {
-        for (const r of records) {
-          setAppTab(r.target);
-        }
-      }).observe(gBrowser.tabContainer, { subtree: true, attributes: true, attributeFilter: [ROW] });
-
-      const peekBar = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
-      peekBar.id = "arc-peek-bar";
-      const peekButton = (name, label) => {
-        const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
-        b.className = `arc-peek-${name}`;
-        b.title = label;
-        b.setAttribute("aria-label", label);
-        peekBar.append(b);
-        return b;
-      };
-      const splitButton = peekButton("split", "Open in Split View");
-      const expandButton = peekButton("expand", "Open as Tab");
-      const closeButton = peekButton("close", "Close");
-      doc.body.append(peekBar);
-      const peekSpinner = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
-      peekSpinner.id = "arc-peek-spinner";
-      doc.body.append(peekSpinner);
-      let peek = null; // { tab, home, origin }
-      // The page under a Peek stays drawn: LibreWolf drops what a tab it
-      // switches away from has drawn (one black frame), unless told not to
-      const keepDrawn = (tab, on) => {
-        try {
-          tab.linkedBrowser.preserveLayers(on);
-          if (on) {
-            tab.linkedBrowser.renderLayers = true;
-            tab.linkedBrowser.docShellIsActive = true;
-          }
-        } catch {}
-      };
-      // where a page was last pressed: the card grows out of the link
-      let lastPagePress = null;
-      win.addEventListener("pointerdown", e => {
-        if (e.target?.localName === "browser") {
-          lastPagePress = { x: e.clientX, y: e.clientY, at: win.performance.now() };
-        }
-      }, true);
-      // where the card ends up: 7.5% in from the page's edges
-      const cardBox = () => {
-        const r = gBrowser.tabpanels.getBoundingClientRect();
-        return { left: r.left + r.width * 0.075, top: r.top + r.height * 0.075, width: r.width * 0.85, height: r.height * 0.85 };
-      };
-      const reducedMotion = () => win.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const EASE = "cubic-bezier(0.2, 0.9, 0.3, 1)"; // fast start, soft landing
-      // (from where the card ends up, 7.5% in from the page's edges: it's
-      // still growing into place when this runs)
-      const placePeekBar = () => {
-        if (!peek) {
-          return;
-        }
-        const r = gBrowser.tabpanels.getBoundingClientRect();
-        const right = Math.round(r.right - r.width * 0.075);
-        const top = Math.round(r.top + r.height * 0.075);
-        peekBar.style.left = `${right - peekBar.offsetWidth}px`;
-        peekBar.style.top = `${top - peekBar.offsetHeight - 8}px`;
-      };
-      win.addEventListener("resize", placePeekBar);
-      const openPeek = (tab, home) => {
-        peek = { tab, home };
-        tab.setAttribute(PEEK, "");
-        home.setAttribute("arc-peek-home", "");
-        dragRoot.setAttribute("arc-peek", "");
-        splitButton.hidden = home.pinned || !!home.splitview;
-        const press = lastPagePress && win.performance.now() - lastPagePress.at < 3000 ? lastPagePress : null;
-        const box = cardBox();
-        peek.origin = press ? { x: press.x - box.left, y: press.y - box.top } : null;
-        // The pinned page dims right away (and is kept drawn: LibreWolf puts
-        // the page it switched away from to sleep); the card waits, hidden,
-        // until its page has drawn (a spinner at the link if that takes a
-        // moment), then grows out of the link: never an empty or black card
-        const show = () => {
-          if (peek?.tab !== tab) {
-            return false;
-          }
-          gBrowser.showSplitViewPanels([home, tab]);
-          doc.getElementById(home.linkedPanel)?.setAttribute("arc-peek-under", "");
-          doc.getElementById(tab.linkedPanel)?.setAttribute("arc-peek-card", "");
-          return true;
+      const peekSection = guard("Peek", () => {
+        const PEEK = "arc-peek-tab";
+        const setAppTab = tab => {
+          try {
+            if (tab.linkedBrowser?.browsingContext) {
+              tab.linkedBrowser.browsingContext.isAppTab = tab.pinned || isRow(tab);
+            }
+          } catch {}
         };
-        const card = doc.getElementById(tab.linkedPanel);
-        card?.setAttribute("arc-peek-waiting", "");
-        keepDrawn(home, true);
-        show();
-        const keepHomeDrawn = win.setInterval(() => {
-          if (peek?.tab !== tab) {
-            win.clearInterval(keepHomeDrawn);
+        for (const tab of gBrowser.tabs) {
+          setAppTab(tab);
+        }
+        gBrowser.tabContainer.addEventListener("TabBrowserInserted", e => setAppTab(e.target));
+        gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
+          if (e.detail?.changed?.includes(ROW)) {
+            setAppTab(e.target);
+          }
+        });
+        new win.MutationObserver(records => {
+          for (const r of records) {
+            setAppTab(r.target);
+          }
+        }).observe(gBrowser.tabContainer, { subtree: true, attributes: true, attributeFilter: [ROW] });
+
+        const peekBar = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+        peekBar.id = "arc-peek-bar";
+        const peekButton = (name, label) => {
+          const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
+          b.className = `arc-peek-${name}`;
+          b.title = label;
+          b.setAttribute("aria-label", label);
+          peekBar.append(b);
+          return b;
+        };
+        const splitButton = peekButton("split", "Open in Split View");
+        const expandButton = peekButton("expand", "Open as Tab");
+        const closeButton = peekButton("close", "Close");
+        doc.body.append(peekBar);
+        const peekSpinner = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+        peekSpinner.id = "arc-peek-spinner";
+        doc.body.append(peekSpinner);
+        let peek = null; // { tab, home, origin }
+        // The page under a Peek stays drawn: LibreWolf drops what a tab it
+        // switches away from has drawn (one black frame), unless told not to
+        const keepDrawn = (tab, on) => {
+          try {
+            tab.linkedBrowser.preserveLayers(on);
+            if (on) {
+              tab.linkedBrowser.renderLayers = true;
+              tab.linkedBrowser.docShellIsActive = true;
+            }
+          } catch {}
+        };
+        // where a page was last pressed: the card grows out of the link
+        let lastPagePress = null;
+        win.addEventListener("pointerdown", e => {
+          if (e.target?.localName === "browser") {
+            lastPagePress = { x: e.clientX, y: e.clientY, at: win.performance.now() };
+          }
+        }, true);
+        // where the card ends up: 7.5% in from the page's edges
+        const cardBox = () => {
+          const r = gBrowser.tabpanels.getBoundingClientRect();
+          return { left: r.left + r.width * 0.075, top: r.top + r.height * 0.075, width: r.width * 0.85, height: r.height * 0.85 };
+        };
+        const reducedMotion = () => win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const EASE = "cubic-bezier(0.2, 0.9, 0.3, 1)"; // fast start, soft landing
+        // (from where the card ends up, 7.5% in from the page's edges: it's
+        // still growing into place when this runs)
+        const placePeekBar = () => {
+          if (!peek) {
             return;
+          }
+          const r = gBrowser.tabpanels.getBoundingClientRect();
+          const right = Math.round(r.right - r.width * 0.075);
+          const top = Math.round(r.top + r.height * 0.075);
+          peekBar.style.left = `${right - peekBar.offsetWidth}px`;
+          peekBar.style.top = `${top - peekBar.offsetHeight - 8}px`;
+        };
+        win.addEventListener("resize", placePeekBar);
+        const openPeek = (tab, home) => {
+          peek = { tab, home };
+          tab.setAttribute(PEEK, "");
+          home.setAttribute("arc-peek-home", "");
+          dragRoot.setAttribute("arc-peek", "");
+          splitButton.hidden = home.pinned || !!home.splitview;
+          const press = lastPagePress && win.performance.now() - lastPagePress.at < 3000 ? lastPagePress : null;
+          const box = cardBox();
+          peek.origin = press ? { x: press.x - box.left, y: press.y - box.top } : null;
+          // The pinned page dims right away (and is kept drawn: LibreWolf puts
+          // the page it switched away from to sleep); the card waits, hidden,
+          // until its page has drawn (a spinner at the link if that takes a
+          // moment), then grows out of the link: never an empty or black card
+          const show = () => {
+            if (peek?.tab !== tab) {
+              return false;
+            }
+            gBrowser.showSplitViewPanels([home, tab]);
+            doc.getElementById(home.linkedPanel)?.setAttribute("arc-peek-under", "");
+            doc.getElementById(tab.linkedPanel)?.setAttribute("arc-peek-card", "");
+            return true;
+          };
+          const card = doc.getElementById(tab.linkedPanel);
+          card?.setAttribute("arc-peek-waiting", "");
+          keepDrawn(home, true);
+          show();
+          const keepHomeDrawn = win.setInterval(() => {
+            if (peek?.tab !== tab) {
+              win.clearInterval(keepHomeDrawn);
+              return;
+            }
+            try {
+              home.linkedBrowser.docShellIsActive = true;
+              home.linkedBrowser.renderLayers = true;
+            } catch {}
+          }, 50);
+          const spinnerAt = press || { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+          peekSpinner.style.left = `${spinnerAt.x}px`;
+          peekSpinner.style.top = `${spinnerAt.y}px`;
+          const spinnerTimer = win.setTimeout(() => peek?.tab === tab && peekSpinner.setAttribute("shown", ""), 150);
+          let revealed = false;
+          const reveal = () => {
+            if (revealed || !show()) {
+              return;
+            }
+            revealed = true;
+            win.clearTimeout(spinnerTimer);
+            win.clearInterval(keepHomeDrawn);
+            gBrowser.removeTabsProgressListener(listener);
+            peekSpinner.removeAttribute("shown");
+            card?.removeAttribute("arc-peek-waiting");
+            if (card && !reducedMotion()) {
+              // out of the link: from a tenth of its size at the press point (or
+              // from the middle, a little smaller)
+              card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
+              card.animate(peek.origin
+                ? [{ transform: "scale(0.1)", opacity: 0 }, { opacity: 1, offset: 0.25 }, { transform: "scale(1)", opacity: 1 }]
+                : [{ transform: "scale(0.96)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }],
+              { duration: peek.origin ? 340 : 220, easing: EASE });
+            }
+            peekBar.setAttribute("shown", "");
+            placePeekBar();
+            peekBar.animate?.([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 340, easing: "ease-out" });
+            tab.linkedBrowser.focus();
+          };
+          // ready: its page's document has arrived (then a beat to draw it), or
+          // it finished loading; at the latest after 4s
+          const listener = {
+            onLocationChange(browser, webProgress, request, location) {
+              if (browser === tab.linkedBrowser && webProgress.isTopLevel && location && !win.isBlankPageURL(location.spec)) {
+                win.setTimeout(() => win.requestAnimationFrame(() => win.requestAnimationFrame(reveal)), 120);
+              }
+            },
+            onStateChange(browser, webProgress, request, flags) {
+              const { STATE_STOP, STATE_IS_WINDOW } = Ci.nsIWebProgressListener;
+              if (browser === tab.linkedBrowser && webProgress.isTopLevel && flags & STATE_STOP && flags & STATE_IS_WINDOW && !win.isBlankPageURL(browser.currentURI.spec)) {
+                win.requestAnimationFrame(() => win.requestAnimationFrame(reveal));
+              }
+            },
+          };
+          gBrowser.addTabsProgressListener(listener);
+          win.setTimeout(reveal, 4000);
+        };
+        // LibreWolf takes the two pages down when it finishes switching to the
+        // Peek's tab (to it that's a tab outside any split view): put them back
+        // before the next frame is drawn
+        new win.MutationObserver(() => {
+          if (peek && !closing && !gBrowser.tabpanels.hasAttribute("splitview")) {
+            gBrowser.showSplitViewPanels([peek.home, peek.tab]);
+          }
+        }).observe(gBrowser.tabpanels, { attributes: true, attributeFilter: ["splitview"] });
+        // how: "close" (gone), "tab" (a normal tab), "split" (beside the row),
+        // "away" (another tab was selected: gone), "gone" (closed already)
+        let closing = false;
+        const closePeek = how => {
+          if (!peek || closing) {
+            return;
+          }
+          // "close": back into the link; "tab": out to the whole page; then put
+          // away (switching tabs or a closed tab: at once)
+          const card = doc.getElementById(peek.tab.linkedPanel);
+          const under = doc.getElementById(peek.home.linkedPanel);
+          if ((how === "close" || how === "tab") && card && !reducedMotion()) {
+            closing = true;
+            peekBar.removeAttribute("shown");
+            let anim;
+            if (how === "tab") {
+              const box = cardBox();
+              const r = gBrowser.tabpanels.getBoundingClientRect();
+              card.style.transformOrigin = `${r.left + r.width / 2 - box.left}px ${r.top + r.height / 2 - box.top}px`;
+              anim = card.animate([{ transform: "scale(1)" }, { transform: `scale(${r.width / box.width}, ${r.height / box.height})`, borderRadius: "0px" }], { duration: 240, easing: EASE, fill: "forwards" });
+            } else {
+              card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
+              anim = card.animate([{ transform: "scale(1)", opacity: 1 }, { opacity: 1, offset: 0.5 }, { transform: peek.origin ? "scale(0.1)" : "scale(0.96)", opacity: 0 }], { duration: 220, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+            }
+            under?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "forwards", pseudoElement: "::after" });
+            anim.finished.catch(() => {}).then(() => {
+              closing = false;
+              card.getAnimations().forEach(a => a.cancel());
+              under?.getAnimations({ subtree: true }).forEach(a => a.cancel());
+              finishPeek(how);
+            });
+            return;
+          }
+          finishPeek(how);
+        };
+        const finishPeek = how => {
+          if (!peek) {
+            return;
+          }
+          const { tab, home } = peek;
+          peek = null;
+          doc.getElementById(tab.linkedPanel)?.style.removeProperty("transform-origin");
+          doc.getElementById(tab.linkedPanel)?.removeAttribute("arc-peek-waiting");
+          if (home.isConnected) {
+            keepDrawn(home, false);
+          }
+          peekSpinner.removeAttribute("shown");
+          peekBar.removeAttribute("shown");
+          dragRoot.removeAttribute("arc-peek");
+          home.removeAttribute("arc-peek-home");
+          tab.removeAttribute(PEEK);
+          for (const t of [home, tab]) {
+            const panel = doc.getElementById(t.linkedPanel);
+            panel?.removeAttribute("arc-peek-under");
+            panel?.removeAttribute("arc-peek-card");
           }
           try {
-            home.linkedBrowser.docShellIsActive = true;
-            home.linkedBrowser.renderLayers = true;
+            gBrowser.tabpanels.removeTabsFromSplitview([home, tab]);
           } catch {}
-        }, 50);
-        const spinnerAt = press || { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-        peekSpinner.style.left = `${spinnerAt.x}px`;
-        peekSpinner.style.top = `${spinnerAt.y}px`;
-        const spinnerTimer = win.setTimeout(() => peek?.tab === tab && peekSpinner.setAttribute("shown", ""), 150);
-        let revealed = false;
-        const reveal = () => {
-          if (revealed || !show()) {
-            return;
+          if (how === "gone" && gBrowser.selectedTab === tab && home.isConnected) {
+            gBrowser.selectedTab = home; // (Cmd+W on it: back to the pinned page)
           }
-          revealed = true;
-          win.clearTimeout(spinnerTimer);
-          win.clearInterval(keepHomeDrawn);
-          gBrowser.removeTabsProgressListener(listener);
-          peekSpinner.removeAttribute("shown");
-          card?.removeAttribute("arc-peek-waiting");
-          if (card && !reducedMotion()) {
-            // out of the link: from a tenth of its size at the press point (or
-            // from the middle, a little smaller)
-            card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
-            card.animate(peek.origin
-              ? [{ transform: "scale(0.1)", opacity: 0 }, { opacity: 1, offset: 0.25 }, { transform: "scale(1)", opacity: 1 }]
-              : [{ transform: "scale(0.96)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }],
-            { duration: peek.origin ? 340 : 220, easing: EASE });
-          }
-          peekBar.setAttribute("shown", "");
-          placePeekBar();
-          peekBar.animate?.([{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 340, easing: "ease-out" });
-          tab.linkedBrowser.focus();
-        };
-        // ready: its page's document has arrived (then a beat to draw it), or
-        // it finished loading; at the latest after 4s
-        const listener = {
-          onLocationChange(browser, webProgress, request, location) {
-            if (browser === tab.linkedBrowser && webProgress.isTopLevel && location && !win.isBlankPageURL(location.spec)) {
-              win.setTimeout(() => win.requestAnimationFrame(() => win.requestAnimationFrame(reveal)), 120);
+          if (how === "close" || how === "away") {
+            if (gBrowser.selectedTab === tab && home.isConnected) {
+              gBrowser.selectedTab = home;
             }
-          },
-          onStateChange(browser, webProgress, request, flags) {
-            const { STATE_STOP, STATE_IS_WINDOW } = Ci.nsIWebProgressListener;
-            if (browser === tab.linkedBrowser && webProgress.isTopLevel && flags & STATE_STOP && flags & STATE_IS_WINDOW && !win.isBlankPageURL(browser.currentURI.spec)) {
-              win.requestAnimationFrame(() => win.requestAnimationFrame(reveal));
+            if (tab.isConnected && !tab.closing) {
+              closeOrReset(tab, { animate: false });
             }
-          },
+          } else if (how === "tab") {
+            moveToRowBlockEnd(tab); // the first normal tab
+          } else if (how === "split" && home.isConnected) {
+            gBrowser.addTabSplitView([home, tab], { insertBefore: home });
+            gBrowser.selectedTab = tab;
+          }
         };
-        gBrowser.addTabsProgressListener(listener);
-        win.setTimeout(reveal, 4000);
-      };
-      // LibreWolf takes the two pages down when it finishes switching to the
-      // Peek's tab (to it that's a tab outside any split view): put them back
-      // before the next frame is drawn
-      new win.MutationObserver(() => {
-        if (peek && !closing && !gBrowser.tabpanels.hasAttribute("splitview")) {
-          gBrowser.showSplitViewPanels([peek.home, peek.tab]);
-        }
-      }).observe(gBrowser.tabpanels, { attributes: true, attributeFilter: ["splitview"] });
-      // how: "close" (gone), "tab" (a normal tab), "split" (beside the row),
-      // "away" (another tab was selected: gone), "gone" (closed already)
-      let closing = false;
-      const closePeek = how => {
-        if (!peek || closing) {
-          return;
-        }
-        // "close": back into the link; "tab": out to the whole page; then put
-        // away (switching tabs or a closed tab: at once)
-        const card = doc.getElementById(peek.tab.linkedPanel);
-        const under = doc.getElementById(peek.home.linkedPanel);
-        if ((how === "close" || how === "tab") && card && !reducedMotion()) {
-          closing = true;
-          peekBar.removeAttribute("shown");
-          let anim;
-          if (how === "tab") {
-            const box = cardBox();
-            const r = gBrowser.tabpanels.getBoundingClientRect();
-            card.style.transformOrigin = `${r.left + r.width / 2 - box.left}px ${r.top + r.height / 2 - box.top}px`;
-            anim = card.animate([{ transform: "scale(1)" }, { transform: `scale(${r.width / box.width}, ${r.height / box.height})`, borderRadius: "0px" }], { duration: 240, easing: EASE, fill: "forwards" });
-          } else {
-            card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
-            anim = card.animate([{ transform: "scale(1)", opacity: 1 }, { opacity: 1, offset: 0.5 }, { transform: peek.origin ? "scale(0.1)" : "scale(0.96)", opacity: 0 }], { duration: 220, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+        closeButton.addEventListener("click", () => closePeek("close"));
+        expandButton.addEventListener("click", () => closePeek("tab"));
+        splitButton.addEventListener("click", () => closePeek("split"));
+        // a link from a pinned page that opens in front: the Peek
+        gBrowser.tabContainer.addEventListener("TabOpen", e => {
+          const tab = e.target;
+          const opener = tab.openerTab;
+          // (or any link Option+clicked a moment ago, from any tab)
+          const asked = Date.now() - altPeekAt < 1500;
+          if (!peek && opener && opener.selected && !opener.splitview && (isPinnedish(opener) || asked)) {
+            tab._arcPeekFrom = { opener, at: win.performance.now() };
+            keepDrawn(opener, true); // (before LibreWolf switches away from it)
+            altPeekAt = 0;
           }
-          under?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "forwards", pseudoElement: "::after" });
-          anim.finished.catch(() => {}).then(() => {
-            closing = false;
-            card.getAnimations().forEach(a => a.cancel());
-            under?.getAnimations({ subtree: true }).forEach(a => a.cancel());
-            finishPeek(how);
-          });
-          return;
-        }
-        finishPeek(how);
-      };
-      const finishPeek = how => {
-        if (!peek) {
-          return;
-        }
-        const { tab, home } = peek;
-        peek = null;
-        doc.getElementById(tab.linkedPanel)?.style.removeProperty("transform-origin");
-        doc.getElementById(tab.linkedPanel)?.removeAttribute("arc-peek-waiting");
-        if (home.isConnected) {
-          keepDrawn(home, false);
-        }
-        peekSpinner.removeAttribute("shown");
-        peekBar.removeAttribute("shown");
-        dragRoot.removeAttribute("arc-peek");
-        home.removeAttribute("arc-peek-home");
-        tab.removeAttribute(PEEK);
-        for (const t of [home, tab]) {
-          const panel = doc.getElementById(t.linkedPanel);
-          panel?.removeAttribute("arc-peek-under");
-          panel?.removeAttribute("arc-peek-card");
-        }
-        try {
-          gBrowser.tabpanels.removeTabsFromSplitview([home, tab]);
-        } catch {}
-        if (how === "gone" && gBrowser.selectedTab === tab && home.isConnected) {
-          gBrowser.selectedTab = home; // (Cmd+W on it: back to the pinned page)
-        }
-        if (how === "close" || how === "away") {
-          if (gBrowser.selectedTab === tab && home.isConnected) {
-            gBrowser.selectedTab = home;
+        });
+        gBrowser.tabContainer.addEventListener("TabSelect", e => {
+          const tab = e.target;
+          if (peek && tab !== peek.tab) {
+            closePeek("away");
           }
-          if (tab.isConnected && !tab.closing) {
-            removeTabForPeek(tab, { animate: false });
+          const from = tab._arcPeekFrom;
+          delete tab._arcPeekFrom;
+          if (from && win.performance.now() - from.at < 2000 && e.detail?.previousTab === from.opener && from.opener.isConnected) {
+            openPeek(tab, from.opener);
           }
-        } else if (how === "tab") {
-          moveToRowBlockEnd(tab); // the first normal tab
-        } else if (how === "split" && home.isConnected) {
-          gBrowser.addTabSplitView([home, tab], { insertBefore: home });
-          gBrowser.selectedTab = tab;
-        }
-      };
-      closeButton.addEventListener("click", () => closePeek("close"));
-      expandButton.addEventListener("click", () => closePeek("tab"));
-      splitButton.addEventListener("click", () => closePeek("split"));
-      // a link from a pinned page that opens in front: the Peek
-      gBrowser.tabContainer.addEventListener("TabOpen", e => {
-        const tab = e.target;
-        const opener = tab.openerTab;
-        // (or any link Option+clicked a moment ago, from any tab)
-        const asked = Date.now() - altPeekAt < 1500;
-        if (!peek && opener && opener.selected && !opener.splitview && (isPinnedish(opener) || asked)) {
-          tab._arcPeekFrom = { opener, at: win.performance.now() };
-          keepDrawn(opener, true); // (before LibreWolf switches away from it)
-          altPeekAt = 0;
-        }
-      });
-      gBrowser.tabContainer.addEventListener("TabSelect", e => {
-        const tab = e.target;
-        if (peek && tab !== peek.tab) {
-          closePeek("away");
-        }
-        const from = tab._arcPeekFrom;
-        delete tab._arcPeekFrom;
-        if (from && win.performance.now() - from.at < 2000 && e.detail?.previousTab === from.opener && from.opener.isConnected) {
-          openPeek(tab, from.opener);
-        }
-      });
-      // Closing the Peek's tab (Cmd+W) closes the Peek; any other way it
-      // goes, the Peek is put away once LibreWolf is done closing it
-      const removeTabForPeek = gBrowser.removeTab;
-      gBrowser.removeTab = (tab, options) => {
-        if (peek && tab === peek.tab && !tab.closing) {
-          closePeek("close");
-          return undefined;
-        }
-        return removeTabForPeek(tab, options);
-      };
-      gBrowser.tabContainer.addEventListener("TabClose", e => {
-        if (peek && (e.target === peek.tab || e.target === peek.home)) {
-          const gone = e.target === peek.tab;
-          win.setTimeout(() => closePeek(gone ? "gone" : "away"), 0);
-        }
-      });
-      // a click on the dimmed page, or Esc, closes it
-      doc.getElementById("tabbrowser-tabpanels")?.addEventListener("mousedown", e => {
-        if (peek && e.button === 0 && e.target?.hasAttribute?.("arc-peek-under")) {
-          e.preventDefault();
-          e.stopPropagation();
-          closePeek("close");
-        }
-      }, true);
-      win.addEventListener("keydown", e => {
-        if (peek && e.key === "Escape" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-          e.preventDefault();
-          closePeek("close");
-        }
-      }, true);
+        });
+        // Closing the Peek's tab (Cmd+W) closes the Peek (see "closing a
+        // pinned row or tile" above); any other way it goes, the Peek is put
+        // away once LibreWolf is done closing it
+        const peekCloses = tab => {
+          if (peek && tab === peek.tab && !tab.closing) {
+            closePeek("close");
+            return true;
+          }
+          return false;
+        };
+        gBrowser.tabContainer.addEventListener("TabClose", e => {
+          if (peek && (e.target === peek.tab || e.target === peek.home)) {
+            const gone = e.target === peek.tab;
+            win.setTimeout(() => closePeek(gone ? "gone" : "away"), 0);
+          }
+        });
+        // a click on the dimmed page, or Esc, closes it
+        doc.getElementById("tabbrowser-tabpanels")?.addEventListener("mousedown", e => {
+          if (peek && e.button === 0 && e.target?.hasAttribute?.("arc-peek-under")) {
+            e.preventDefault();
+            e.stopPropagation();
+            closePeek("close");
+          }
+        }, true);
+        win.addEventListener("keydown", e => {
+          if (peek && e.key === "Escape" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+            e.preventDefault();
+            closePeek("close");
+          }
+        }, true);
+        return { peekCloses };
+      }) ?? {};
 
       // --- profile switcher (Arc's Space switcher, with LibreWolf profiles) ---
       // In the middle of the sidebar's bottom row: the profiles' avatars
@@ -2564,115 +2628,117 @@ try {
       // New profiles are made from LibreWolf's Profiles menu (and set up on
       // their first run, see above). Hidden in private windows and when
       // LibreWolf's profiles are off.
-      const profilesBox = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
-      profilesBox.id = "arc-profiles";
-      profilesBox.hidden = true;
-      doc.getElementById("downloads-button")?.after(profilesBox);
-      let profileService = null;
-      try {
-        ({ SelectableProfileService: profileService } = win.ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
-      } catch {}
-      // As many as fit between Downloads and Extensions (centered, 4px clear
-      // of them; 30px buttons 4px apart, like the other icon buttons): fewer
-      // in a narrow sidebar
-      const maxProfiles = () => {
-        const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
-        // Downloads ends 43px in, Extensions starts 42px from the end
-        const room = width - 2 * 47;
-        return Math.max(1, Math.floor((room + 4) / 34));
-      };
-      let lastProfiles = null;
-      // (list, current): also called by the tests with made-up profiles
-      const renderProfiles = async (list, current) => {
-        lastProfiles = [list, current];
-        const max = maxProfiles();
-        const shown = list.filter(p => p.id === current?.id);
-        for (const p of list) {
-          if (shown.length >= max) {
-            break;
+      guard("profile switcher", () => {
+        const profilesBox = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
+        profilesBox.id = "arc-profiles";
+        profilesBox.hidden = true;
+        doc.getElementById("downloads-button")?.after(profilesBox);
+        let profileService = null;
+        try {
+          ({ SelectableProfileService: profileService } = win.ChromeUtils.importESModule("resource:///modules/profiles/SelectableProfileService.sys.mjs"));
+        } catch {}
+        // As many as fit between Downloads and Extensions (centered, 4px clear
+        // of them; 30px buttons 4px apart, like the other icon buttons): fewer
+        // in a narrow sidebar
+        const maxProfiles = () => {
+          const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
+          // Downloads ends 43px in, Extensions starts 42px from the end
+          const room = width - 2 * 47;
+          return Math.max(1, Math.floor((room + 4) / 34));
+        };
+        let lastProfiles = null;
+        // (list, current): also called by the tests with made-up profiles
+        const renderProfiles = async (list, current) => {
+          lastProfiles = [list, current];
+          const max = maxProfiles();
+          const shown = list.filter(p => p.id === current?.id);
+          for (const p of list) {
+            if (shown.length >= max) {
+              break;
+            }
+            if (!shown.includes(p)) {
+              shown.push(p);
+            }
           }
-          if (!shown.includes(p)) {
-            shown.push(p);
+          shown.sort((a, b) => list.indexOf(a) - list.indexOf(b));
+          const buttons = [];
+          for (const p of shown) {
+            const isCurrent = p.id === current?.id;
+            const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
+            b.className = "arc-profile";
+            b.title = p.name;
+            b.setAttribute("aria-label", p.name);
+            b.addEventListener("click", () => !isCurrent && profileService?.launchInstance(p));
+            b.toggleAttribute("current", isCurrent);
+            if (isCurrent) {
+              b.setAttribute("aria-current", "true");
+            }
+            const img = doc.createElementNS("http://www.w3.org/1999/xhtml", "img");
+            img.alt = "";
+            try {
+              img.src = p.hasCustomAvatar ? await p.getAvatarURL(20) : `chrome://browser/content/profiles/assets/20_${p.avatar}.svg`;
+            } catch {
+              img.src = "chrome://browser/content/profiles/assets/20_default-favicon.svg";
+            }
+            if (p.theme?.themeBg) {
+              b.style.setProperty("--arc-profile-bg", p.theme.themeBg);
+            }
+            if (p.theme?.themeFg) {
+              b.style.setProperty("--arc-profile-fg", p.theme.themeFg);
+            }
+            b.append(img);
+            buttons.push(b);
           }
-        }
-        shown.sort((a, b) => list.indexOf(a) - list.indexOf(b));
-        const buttons = [];
-        for (const p of shown) {
-          const isCurrent = p.id === current?.id;
-          const b = doc.createElementNS("http://www.w3.org/1999/xhtml", "button");
-          b.className = "arc-profile";
-          b.title = p.name;
-          b.setAttribute("aria-label", p.name);
-          b.addEventListener("click", () => !isCurrent && profileService?.launchInstance(p));
-          b.toggleAttribute("current", isCurrent);
-          if (isCurrent) {
-            b.setAttribute("aria-current", "true");
+          profilesBox.replaceChildren(...buttons);
+          // (one profile alone has nothing to switch to)
+          profilesBox.hidden = buttons.length < 2;
+        };
+        profilesBox._arcRender = renderProfiles;
+        const refreshProfiles = async () => {
+          if (isPrivate || !profileService) {
+            profilesBox.hidden = true;
+            return;
           }
-          const img = doc.createElementNS("http://www.w3.org/1999/xhtml", "img");
-          img.alt = "";
+          // LibreWolf's profile service starts up in its own time: at launch it
+          // had no profiles to give yet
           try {
-            img.src = p.hasCustomAvatar ? await p.getAvatarURL(20) : `chrome://browser/content/profiles/assets/20_${p.avatar}.svg`;
-          } catch {
-            img.src = "chrome://browser/content/profiles/assets/20_default-favicon.svg";
+            if (!profileService.initialized) {
+              await profileService.init();
+            }
+          } catch {}
+          if (!profileService.isEnabled) {
+            profilesBox.hidden = true;
+            return;
           }
-          if (p.theme?.themeBg) {
-            b.style.setProperty("--arc-profile-bg", p.theme.themeBg);
+          let list = [];
+          try {
+            list = await profileService.getAllProfiles();
+          } catch {}
+          renderProfiles(list, profileService.currentProfile);
+        };
+        if (!isPrivate && profileService) {
+          const profilesObserver = { observe: () => refreshProfiles() };
+          win.Services.obs.addObserver(profilesObserver, "sps-profiles-updated");
+          const onEnable = () => refreshProfiles();
+          profileService.on?.("enableChanged", onEnable);
+          win.addEventListener("unload", () => {
+            win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated");
+            profileService.off?.("enableChanged", onEnable);
+          }, { once: true });
+          refreshProfiles();
+          // (and once LibreWolf has settled, in case it was still busy)
+          SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(refreshProfiles, 1000));
+        }
+        // the sidebar resized: recount what fits
+        let profilesFit = maxProfiles();
+        new win.ResizeObserver(() => {
+          const fit = maxProfiles();
+          if (fit !== profilesFit && lastProfiles) {
+            profilesFit = fit;
+            renderProfiles(...lastProfiles);
           }
-          if (p.theme?.themeFg) {
-            b.style.setProperty("--arc-profile-fg", p.theme.themeFg);
-          }
-          b.append(img);
-          buttons.push(b);
-        }
-        profilesBox.replaceChildren(...buttons);
-        // (one profile alone has nothing to switch to)
-        profilesBox.hidden = buttons.length < 2;
-      };
-      profilesBox._arcRender = renderProfiles;
-      const refreshProfiles = async () => {
-        if (isPrivate || !profileService) {
-          profilesBox.hidden = true;
-          return;
-        }
-        // LibreWolf's profile service starts up in its own time: at launch it
-        // had no profiles to give yet
-        try {
-          if (!profileService.initialized) {
-            await profileService.init();
-          }
-        } catch {}
-        if (!profileService.isEnabled) {
-          profilesBox.hidden = true;
-          return;
-        }
-        let list = [];
-        try {
-          list = await profileService.getAllProfiles();
-        } catch {}
-        renderProfiles(list, profileService.currentProfile);
-      };
-      if (!isPrivate && profileService) {
-        const profilesObserver = { observe: () => refreshProfiles() };
-        win.Services.obs.addObserver(profilesObserver, "sps-profiles-updated");
-        const onEnable = () => refreshProfiles();
-        profileService.on?.("enableChanged", onEnable);
-        win.addEventListener("unload", () => {
-          win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated");
-          profileService.off?.("enableChanged", onEnable);
-        }, { once: true });
-        refreshProfiles();
-        // (and once LibreWolf has settled, in case it was still busy)
-        SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(refreshProfiles, 1000));
-      }
-      // the sidebar resized: recount what fits
-      let profilesFit = maxProfiles();
-      new win.ResizeObserver(() => {
-        const fit = maxProfiles();
-        if (fit !== profilesFit && lastProfiles) {
-          profilesFit = fit;
-          renderProfiles(...lastProfiles);
-        }
-      }).observe(doc.querySelector("sidebar-main") || doc.documentElement);
+        }).observe(doc.querySelector("sidebar-main") || doc.documentElement);
+      });
 
       // --- the same sidebar in every window (as in Arc) ---
       // When another window saves the shared list, this window makes its own
@@ -2832,97 +2898,89 @@ try {
             next++;
           });
         } catch (e) {
-          console.error("Arc sidebar (sync):", e);
+          report("sync", e);
         } finally {
           syncing = false;
         }
       }
-      if (!isPrivate) {
-        let followTimer = null;
-        // (not this window's own save, and not while this window has changes
-        // of its own waiting to be saved: they're newer)
-        const sharedObserver = {
-          observe: () => {
-            if (writing) {
-              return;
-            }
-            win.clearTimeout(followTimer);
-            // (what moves here glides there, as for a change made here)
-            followTimer = win.setTimeout(() => {
-              if (rowsRestored && saveTimer === null) {
-                const places = notePlaces();
-                reconcile();
-                glideFrom(places);
+      guard("following other windows", () => {
+        if (!isPrivate) {
+          let followTimer = null;
+          // (not this window's own save, and not while this window has changes
+          // of its own waiting to be saved: they're newer)
+          const sharedObserver = {
+            observe: () => {
+              if (writing) {
+                return;
               }
-            }, 150);
-          },
-        };
-        prefs.addObserver(ROWS_PREF, sharedObserver);
-        prefs.addObserver(TILES_PREF, sharedObserver);
-        win.addEventListener("unload", () => {
-          prefs.removeObserver(ROWS_PREF, sharedObserver);
-          prefs.removeObserver(TILES_PREF, sharedObserver);
-        }, { once: true });
-      }
+              win.clearTimeout(followTimer);
+              // (what moves here glides there, as for a change made here)
+              followTimer = win.setTimeout(() => {
+                if (rowsRestored && saveTimer === null) {
+                  const places = notePlaces();
+                  reconcile();
+                  glideFrom(places);
+                }
+              }, 150);
+            },
+          };
+          prefs.addObserver(ROWS_PREF, sharedObserver);
+          prefs.addObserver(TILES_PREF, sharedObserver);
+          win.addEventListener("unload", () => {
+            prefs.removeObserver(ROWS_PREF, sharedObserver);
+            prefs.removeObserver(TILES_PREF, sharedObserver);
+          }, { once: true });
+        }
+      });
 
       // Right-click: "Back to Pinned Page" / "Set Pinned Page to This Page",
       // on a pinned row or tile that's away from its pinned page
-      const tabMenu = doc.getElementById("tabContextMenu");
-      if (tabMenu) {
-        const contextTab = () => win.TabContextMenu?.contextTab;
-        const item = (label, action) => {
-          const menuitem = doc.createXULElement("menuitem");
-          menuitem.setAttribute("label", label);
-          menuitem.addEventListener("command", () => {
-            const tab = contextTab();
-            if (tab) {
-              action(tab);
+      guard("pinned page menu items", () => {
+        const tabMenu = doc.getElementById("tabContextMenu");
+        if (tabMenu) {
+          const contextTab = () => win.TabContextMenu?.contextTab;
+          const item = (label, action) => {
+            const menuitem = doc.createXULElement("menuitem");
+            menuitem.setAttribute("label", label);
+            menuitem.addEventListener("command", () => {
+              const tab = contextTab();
+              if (tab) {
+                action(tab);
+              }
+            });
+            return menuitem;
+          };
+          const backItem = item("Back to Pinned Page", tab => goHome(tab));
+          const setItem = item("Set Pinned Page to This Page", tab => setHome(tab, homeHere(tab)));
+          const anchor = doc.getElementById("context_unpinTab") || doc.getElementById("context_pinTab");
+          tabMenu.insertBefore(setItem, anchor?.nextSibling ?? tabMenu.firstChild);
+          tabMenu.insertBefore(backItem, setItem);
+          tabMenu.addEventListener("popupshowing", e => {
+            if (e.target !== tabMenu) {
+              return;
             }
+            const tab = contextTab();
+            const show = !!tab && isPinnedish(tab) && isAway(tab);
+            backItem.hidden = !show;
+            setItem.hidden = !show;
           });
-          return menuitem;
-        };
-        const backItem = item("Back to Pinned Page", tab => goHome(tab));
-        const setItem = item("Set Pinned Page to This Page", tab => setHome(tab, homeHere(tab)));
-        const anchor = doc.getElementById("context_unpinTab") || doc.getElementById("context_pinTab");
-        tabMenu.insertBefore(setItem, anchor?.nextSibling ?? tabMenu.firstChild);
-        tabMenu.insertBefore(backItem, setItem);
-        tabMenu.addEventListener("popupshowing", e => {
-          if (e.target !== tabMenu) {
-            return;
-          }
-          const tab = contextTab();
-          const show = !!tab && isPinnedish(tab) && isAway(tab);
-          backItem.hidden = !show;
-          setItem.hidden = !show;
-        });
-      }
+        }
+      });
 
       // --- motion: split views ---
       // Two tabs joining or separating glide into place, with whatever moves
       // for them (see "motion" above; not during drags, which glide on their
       // own)
-      const addTabSplitViewUnglided = gBrowser.addTabSplitView.bind(gBrowser);
-      gBrowser.addTabSplitView = (...args) => {
+      // (joining: see "split view by drag and drop")
+      const splitClass = win.customElements.get("tab-split-view-wrapper");
+      const glideApart = original => function (...args) {
         const places = notePlaces();
         try {
-          return addTabSplitViewUnglided(...args);
+          return original.apply(this, args);
         } finally {
           glideFrom(places);
         }
       };
-      const splitClass = win.customElements.get("tab-split-view-wrapper");
-      if (splitClass && !splitClass.prototype._arcGlide) {
-        splitClass.prototype._arcGlide = true;
-        const unsplitTabs = splitClass.prototype.unsplitTabs;
-        splitClass.prototype.unsplitTabs = function (...args) {
-          const places = notePlaces();
-          try {
-            return unsplitTabs.apply(this, args);
-          } finally {
-            glideFrom(places);
-          }
-        };
-      }
 
       // --- Tile colors (as in Zen) ---
       // A tile's icon gives it up to three colors (the most common saturated
@@ -3031,312 +3089,353 @@ try {
       // new page starts loading (Reddit's bot check page has none, so at
       // launch its tile was blank for seconds); the one saved with its pinned
       // page fills in until the page brings its own
-      gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
-        const tab = e.target;
-        if (!tab.pinned || !e.detail?.changed?.includes("image")) {
-          return;
+      guard("tile colors", () => {
+        gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
+          const tab = e.target;
+          if (!tab.pinned || !e.detail?.changed?.includes("image")) {
+            return;
+          }
+          const icon = !tab.getAttribute("image") && getHome(tab)?.icon;
+          if (icon) {
+            try {
+              gBrowser.setIcon(tab, icon);
+            } catch {}
+            return; // (that change comes back here and updates the colors)
+          }
+          updateTileColors(tab);
+        });
+        gBrowser.tabContainer.addEventListener("TabPinned", e => updateTileColors(e.target));
+        for (const tab of gBrowser.tabs) {
+          updateTileColors(tab);
         }
-        const icon = !tab.getAttribute("image") && getHome(tab)?.icon;
-        if (icon) {
-          try {
-            gBrowser.setIcon(tab, icon);
-          } catch {}
-          return; // (that change comes back here and updates the colors)
-        }
-        updateTileColors(tab);
       });
-      gBrowser.tabContainer.addEventListener("TabPinned", e => updateTileColors(e.target));
-      for (const tab of gBrowser.tabs) {
-        updateTileColors(tab);
-      }
 
       // Floating edit: an edit in the floating (Cmd+T) bar stays there even if
       // the sidebar opens. Marks the window while such an edit is in
       // progress; userChrome.css does the rest.
-      const root = doc.documentElement;
-      const urlbar = doc.getElementById("urlbar");
-      const sidebar = doc.getElementById("sidebar-container");
-      if (urlbar && sidebar) {
-        const collapsed = () =>
-          root.hasAttribute("sidebar-expand-on-hover") &&
-          !sidebar.hasAttribute("sidebar-launcher-expanded");
-        const engineMenuOpen = () =>
-          !!urlbar.querySelector(".searchmode-switcher-panel-list:is([open], [showing])");
-        // LibreWolf briefly takes focus away while the sidebar hides, so a
-        // focus loss only ends the floating edit if it lasts a moment
-        const END_DELAY_MS = 150;
-        let endTimer = null;
-        const editInProgress = () => urlbar.hasAttribute("focused") || engineMenuOpen();
-        // Enter / Escape are a clear "done": end as soon as focus has left,
-        // without the delay (so the bar doesn't linger)
-        urlbar.addEventListener("keydown", e => {
-          if (e.key === "Enter" || e.key === "Escape") {
-            win.setTimeout(() => {
-              if (!editInProgress()) {
-                win.clearTimeout(endTimer);
-                endTimer = null;
-                root.removeAttribute("arc-floating-urlbar");
-              }
-            }, 30);
-          }
-        });
-        const sync = () => {
-          if (urlbar.hasAttribute("focused")) {
-            win.clearTimeout(endTimer);
-            endTimer = null;
-            if (collapsed()) {
-              root.setAttribute("arc-floating-urlbar", "");
-            }
-          } else if (!engineMenuOpen() && endTimer === null) {
-            endTimer = win.setTimeout(() => {
-              endTimer = null;
-              if (!editInProgress()) {
-                root.removeAttribute("arc-floating-urlbar");
-              }
-            }, END_DELAY_MS);
-          }
-        };
-        const observer = new win.MutationObserver(sync);
-        observer.observe(urlbar, { attributes: true, attributeFilter: ["focused"] });
-        observer.observe(sidebar, { attributes: true, attributeFilter: ["sidebar-launcher-expanded"] });
-        doc.addEventListener("popuphidden", sync);
-
-        // A click in the sidebar or the toolbar (outside the URL bar) ends an
-        // edit, as a click on the page does. The sidebar never takes the
-        // focus, so the bar stayed open with only its suggestions gone.
-        const urlbarContainer = doc.getElementById("urlbar-container");
-        const endEditOnClick = e => {
-          if (e.button === 0 && win.gURLBar?.focused && !urlbarContainer?.contains(e.target)) {
-            gBrowser.selectedBrowser.focus();
-          }
-        };
-        sidebar.addEventListener("mousedown", endEditOnClick, true);
-        doc.getElementById("navigator-toolbox")?.addEventListener("mousedown", endEditOnClick, true);
-
-        // New tab bar (Arc-style): Cmd+T and + New Tab open the floating URL
-        // bar instead of a tab; the tab is created only when Enter loads
-        // something (picking an open tab switches to it). Esc, clicking away
-        // or pressing again closes it. While it's open the window is marked
-        // [arc-newtab-bar]: userChrome.css floats the bar even with the
-        // sidebar shown and highlights + New Tab.
-        // Cmd+T and the New Tab menu items use the second command
-        const newTabCommands = ["cmd_newNavigatorTab", "cmd_newNavigatorTabNoEvent"]
-          .map(id => doc.getElementById(id))
-          .filter(Boolean);
-        const gURLBar = win.gURLBar;
-        if (newTabCommands.length && gURLBar?.controller) {
-          const barOpen = () => root.hasAttribute("arc-newtab-bar");
-          let closeTimer = null;
-          let blurClosedAt = -1000; // when the bar last closed because focus left it
-          let loading = false;
-          // Closing, it fades out where it is (as Spotlight does), then goes
-          // back to the sidebar; the page has the focus at once
-          let fading = null;
-          const backInSidebar = revert => {
-            fading?.cancel();
-            fading = null;
-            root.removeAttribute("arc-newtab-fading");
-            // without the sidebar bar's width animation
-            root.setAttribute("arc-newtab-closing", "");
-            win.requestAnimationFrame(() => win.requestAnimationFrame(() =>
-              root.removeAttribute("arc-newtab-closing")));
-            // Nothing was opened, or another tab was picked: show the current
-            // tab's address (held back while the bar was open)
-            if (revert) {
-              gURLBar.handleRevert();
-            }
-          };
-          const closeBar = () => {
-            win.clearTimeout(closeTimer);
-            closeTimer = null;
-            if (!barOpen()) {
-              return;
-            }
-            const revert = !loading;
-            root.removeAttribute("arc-newtab-bar");
-            // After Enter, LibreWolf handles the address and the focus
-            if (!loading && gURLBar.focused) {
-              gBrowser.selectedBrowser.focus();
-            }
-            loading = false;
-            const bar = doc.getElementById("urlbar");
-            if (!bar || win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-              backInSidebar(revert);
-              return;
-            }
-            root.setAttribute("arc-newtab-fading", "");
-            const anim = bar.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.97 }],
-              { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
-            fading = anim;
-            anim.finished.then(() => fading === anim && backInSidebar(revert), () => {});
-          };
-          const openBar = () => {
-            // (opened again while still fading out: straight back)
-            if (fading) {
-              fading.cancel();
-              fading = null;
-              root.removeAttribute("arc-newtab-fading");
-            }
-            root.setAttribute("arc-newtab-bar", "");
-            gURLBar.focus();
-            gURLBar.value = "";
-            // As if typing: the current page's badges (Not Secure, star, ...)
-            // don't belong to the new tab
-            gURLBar.setPageProxyState("invalid", true);
-          };
-          // Our listener on the commands themselves runs before LibreWolf's
-          // (on the command set), which would open a tab
-          const toggleBar = e => {
-            e.stopPropagation();
-            // A click on + New Tab while the bar is open may already have
-            // closed it by taking the focus: that click means "close". Only
-            // then (a keyboard Cmd+T right after Enter or Esc always opens).
-            // (a click comes from the + New Tab button, a key press from its
-            // key; LibreWolf doesn't reliably say which input it was, so look
-            // at what sent the command, through the chain of source events)
-            let byMouse = false;
-            for (let ev = e, depth = 0; ev && depth < 4; ev = ev.sourceEvent, depth++) {
-              if (ev.target?.localName === "toolbarbutton" || /^(mouse|click|pointer)/.test(ev.type)) {
-                byMouse = true;
-              }
-            }
-            if (barOpen()) {
-              closeBar();
-            } else if (!byMouse || win.performance.now() - blurClosedAt > 300) {
-              openBar();
-            }
-          };
-          for (const command of newTabCommands) {
-            command.addEventListener("command", toggleBar);
-          }
-          // While the bar is open, LibreWolf's address updates (e.g. the tab
-          // opened by the previous Enter finishing its load) would fill the
-          // empty bar with that tab's address: they wait until it closes
-          const setURI = gURLBar.setURI.bind(gURLBar);
-          gURLBar.setURI = (...args) => {
-            if (barOpen()) {
-              return undefined;
-            }
-            return setURI(...args);
-          };
-          // Enter loads in a new tab (an empty current tab is still reused)
-          const controller = gURLBar.controller;
-          const whereToOpen = controller.whereToOpen.bind(controller);
-          controller.whereToOpen = event => {
-            let where = whereToOpen(event);
-            if (!barOpen()) {
-              return where;
-            }
-            if (where === "current" && !gBrowser.selectedTab.isEmpty && gBrowser.selectedTab !== startPage) {
-              where = "tab";
-            }
-            // Loading in this tab (an empty one) selects no other tab, so
-            // close the bar here once the load has started
-            loading = true;
-            win.setTimeout(closeBar, 0);
-            return where;
-          };
-          // Esc closes it at once (unless it's closing the engine menu)
+      const commandBar = guard("floating edit and command bar", () => {
+        const patches = {}; // the URL bar's own code it replaces (see the end)
+        const root = doc.documentElement;
+        const urlbar = doc.getElementById("urlbar");
+        const sidebar = doc.getElementById("sidebar-container");
+        if (urlbar && sidebar) {
+          const collapsed = () =>
+            root.hasAttribute("sidebar-expand-on-hover") &&
+            !sidebar.hasAttribute("sidebar-launcher-expanded");
+          const engineMenuOpen = () =>
+            !!urlbar.querySelector(".searchmode-switcher-panel-list:is([open], [showing])");
+          // LibreWolf briefly takes focus away while the sidebar hides, so a
+          // focus loss only ends the floating edit if it lasts a moment
+          const END_DELAY_MS = 150;
+          let endTimer = null;
+          const editInProgress = () => urlbar.hasAttribute("focused") || engineMenuOpen();
+          // Enter / Escape are a clear "done": end as soon as focus has left,
+          // without the delay (so the bar doesn't linger)
           urlbar.addEventListener("keydown", e => {
-            if (e.key === "Escape" && barOpen() && !engineMenuOpen()) {
-              e.preventDefault();
-              e.stopPropagation();
-              closeBar();
-            }
-          }, true);
-          // Focus leaving for a moment (not just LibreWolf's brief drop while
-          // the sidebar moves) closes it; so does switching tabs
-          const syncBar = () => {
-            if (!barOpen()) {
-              return;
-            }
-            if (editInProgress()) {
-              win.clearTimeout(closeTimer);
-              closeTimer = null;
-            } else if (closeTimer === null) {
-              closeTimer = win.setTimeout(() => {
-                closeTimer = null;
+            if (e.key === "Enter" || e.key === "Escape") {
+              win.setTimeout(() => {
                 if (!editInProgress()) {
-                  blurClosedAt = win.performance.now();
-                  closeBar();
+                  win.clearTimeout(endTimer);
+                  endTimer = null;
+                  root.removeAttribute("arc-floating-urlbar");
+                }
+              }, 30);
+            }
+          });
+          const sync = () => {
+            if (urlbar.hasAttribute("focused")) {
+              win.clearTimeout(endTimer);
+              endTimer = null;
+              if (collapsed()) {
+                root.setAttribute("arc-floating-urlbar", "");
+              }
+            } else if (!engineMenuOpen() && endTimer === null) {
+              endTimer = win.setTimeout(() => {
+                endTimer = null;
+                if (!editInProgress()) {
+                  root.removeAttribute("arc-floating-urlbar");
                 }
               }, END_DELAY_MS);
             }
           };
-          new win.MutationObserver(syncBar).observe(urlbar, { attributes: true, attributeFilter: ["focused"] });
-          doc.addEventListener("popuphidden", syncBar);
-          gBrowser.tabContainer.addEventListener("TabSelect", () => {
-            closeBar();
-            leaveStartPage();
-          });
+          const observer = new win.MutationObserver(sync);
+          observer.observe(urlbar, { attributes: true, attributeFilter: ["focused"] });
+          observer.observe(sidebar, { attributes: true, attributeFilter: ["sidebar-launcher-expanded"] });
+          doc.addEventListener("popuphidden", sync);
 
-          // A new window (the first one at launch too) starts with the bar
-          // instead of a blank tab. Its empty first tab stays out of the
-          // sidebar ([arc-start-page]) as the page behind the bar: whatever
-          // loads in it makes it a normal tab (Enter loads there), and if
-          // another tab is selected while it's still empty, it's closed.
-          let startPage = null;
-          const keepStartPage = () => {
-            startPage?.removeAttribute("arc-start-page");
-            startPage = null;
+          // A click in the sidebar or the toolbar (outside the URL bar) ends an
+          // edit, as a click on the page does. The sidebar never takes the
+          // focus, so the bar stayed open with only its suggestions gone.
+          const urlbarContainer = doc.getElementById("urlbar-container");
+          const endEditOnClick = e => {
+            if (e.button === 0 && win.gURLBar?.focused && !urlbarContainer?.contains(e.target)) {
+              gBrowser.selectedBrowser.focus();
+            }
           };
-          function leaveStartPage() {
-            if (!startPage || gBrowser.selectedTab === startPage) {
-              return;
-            }
-            const tab = startPage;
-            startPage = null;
-            if (tab.isConnected && tab.isEmptyIgnoringLoad) {
-              gBrowser.removeTab(tab, { animate: false });
-            } else {
-              tab.removeAttribute("arc-start-page");
-            }
-          }
-          gBrowser.addTabsProgressListener({
-            onLocationChange(browser, webProgress, request, location) {
-              if (startPage && browser === startPage.linkedBrowser &&
-                  webProgress.isTopLevel && !win.isBlankPageURL(location.spec)) {
-                keepStartPage();
+          sidebar.addEventListener("mousedown", endEditOnClick, true);
+          doc.getElementById("navigator-toolbox")?.addEventListener("mousedown", endEditOnClick, true);
+
+          // New tab bar (Arc-style): Cmd+T and + New Tab open the floating URL
+          // bar instead of a tab; the tab is created only when Enter loads
+          // something (picking an open tab switches to it). Esc, clicking away
+          // or pressing again closes it. While it's open the window is marked
+          // [arc-newtab-bar]: userChrome.css floats the bar even with the
+          // sidebar shown and highlights + New Tab.
+          // Cmd+T and the New Tab menu items use the second command
+          const newTabCommands = ["cmd_newNavigatorTab", "cmd_newNavigatorTabNoEvent"]
+            .map(id => doc.getElementById(id))
+            .filter(Boolean);
+          const gURLBar = win.gURLBar;
+          if (newTabCommands.length && gURLBar?.controller) {
+            const barOpen = () => root.hasAttribute("arc-newtab-bar");
+            let closeTimer = null;
+            let blurClosedAt = -1000; // when the bar last closed because focus left it
+            let loading = false;
+            // Closing, it fades out where it is (as Spotlight does), then goes
+            // back to the sidebar; the page has the focus at once
+            let fading = null;
+            const backInSidebar = revert => {
+              fading?.cancel();
+              fading = null;
+              root.removeAttribute("arc-newtab-fading");
+              // without the sidebar bar's width animation
+              root.setAttribute("arc-newtab-closing", "");
+              win.requestAnimationFrame(() => win.requestAnimationFrame(() =>
+                root.removeAttribute("arc-newtab-closing")));
+              // Nothing was opened, or another tab was picked: show the current
+              // tab's address (held back while the bar was open)
+              if (revert) {
+                gURLBar.handleRevert();
               }
-            },
-          });
-          // Closing the last open row or tile lands on such a page too (made
-          // here, or the window's current one); the bar opens once it's shown
-          openStartPage = () => {
-            const tab = startPage?.isConnected ? startPage : gBrowser.addTrustedTab(win.BROWSER_NEW_TAB_URL);
-            startPage = tab;
-            tab.setAttribute("arc-start-page", "");
-            win.setTimeout(() => {
-              if (gBrowser.selectedTab === tab && !barOpen()) {
+            };
+            const closeBar = () => {
+              win.clearTimeout(closeTimer);
+              closeTimer = null;
+              if (!barOpen()) {
+                return;
+              }
+              const revert = !loading;
+              root.removeAttribute("arc-newtab-bar");
+              // After Enter, LibreWolf handles the address and the focus
+              if (!loading && gURLBar.focused) {
+                gBrowser.selectedBrowser.focus();
+              }
+              loading = false;
+              const bar = doc.getElementById("urlbar");
+              if (!bar || win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                backInSidebar(revert);
+                return;
+              }
+              root.setAttribute("arc-newtab-fading", "");
+              const anim = bar.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.97 }],
+                { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+              fading = anim;
+              anim.finished.then(() => fading === anim && backInSidebar(revert), () => {});
+            };
+            const openBar = () => {
+              // (opened again while still fading out: straight back)
+              if (fading) {
+                fading.cancel();
+                fading = null;
+                root.removeAttribute("arc-newtab-fading");
+              }
+              root.setAttribute("arc-newtab-bar", "");
+              gURLBar.focus();
+              gURLBar.value = "";
+              // As if typing: the current page's badges (Not Secure, star, ...)
+              // don't belong to the new tab
+              gURLBar.setPageProxyState("invalid", true);
+            };
+            // Our listener on the commands themselves runs before LibreWolf's
+            // (on the command set), which would open a tab
+            const toggleBar = e => {
+              e.stopPropagation();
+              // A click on + New Tab while the bar is open may already have
+              // closed it by taking the focus: that click means "close". Only
+              // then (a keyboard Cmd+T right after Enter or Esc always opens).
+              // (a click comes from the + New Tab button, a key press from its
+              // key; LibreWolf doesn't reliably say which input it was, so look
+              // at what sent the command, through the chain of source events)
+              let byMouse = false;
+              for (let ev = e, depth = 0; ev && depth < 4; ev = ev.sourceEvent, depth++) {
+                if (ev.target?.localName === "toolbarbutton" || /^(mouse|click|pointer)/.test(ev.type)) {
+                  byMouse = true;
+                }
+              }
+              if (barOpen()) {
+                closeBar();
+              } else if (!byMouse || win.performance.now() - blurClosedAt > 300) {
                 openBar();
               }
-            }, 0);
-            return tab;
-          };
-          win.SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
-            const tab = gBrowser.selectedTab;
-            if (tab.pinned || isRow(tab) || !tab.isEmptyIgnoringLoad) {
-              return;
+            };
+            for (const command of newTabCommands) {
+              command.addEventListener("command", toggleBar);
             }
-            startPage = tab;
-            tab.setAttribute("arc-start-page", "");
-            openBar();
-          }, 0));
+            // While the bar is open, LibreWolf's address updates (e.g. the tab
+            // opened by the previous Enter finishing its load) would fill the
+            // empty bar with that tab's address: they wait until it closes
+            patches.holdAddress = original => function (...args) {
+              if (barOpen()) {
+                return undefined;
+              }
+              return original.apply(this, args);
+            };
+            // Enter loads in a new tab (an empty current tab is still reused)
+            patches.enterOpensTab = original => function (event) {
+              let where = original.call(this, event);
+              if (!barOpen()) {
+                return where;
+              }
+              if (where === "current" && !gBrowser.selectedTab.isEmpty && gBrowser.selectedTab !== startPage) {
+                where = "tab";
+              }
+              // Loading in this tab (an empty one) selects no other tab, so
+              // close the bar here once the load has started
+              loading = true;
+              win.setTimeout(closeBar, 0);
+              return where;
+            };
+            // Esc closes it at once (unless it's closing the engine menu)
+            urlbar.addEventListener("keydown", e => {
+              if (e.key === "Escape" && barOpen() && !engineMenuOpen()) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeBar();
+              }
+            }, true);
+            // Focus leaving for a moment (not just LibreWolf's brief drop while
+            // the sidebar moves) closes it; so does switching tabs
+            const syncBar = () => {
+              if (!barOpen()) {
+                return;
+              }
+              if (editInProgress()) {
+                win.clearTimeout(closeTimer);
+                closeTimer = null;
+              } else if (closeTimer === null) {
+                closeTimer = win.setTimeout(() => {
+                  closeTimer = null;
+                  if (!editInProgress()) {
+                    blurClosedAt = win.performance.now();
+                    closeBar();
+                  }
+                }, END_DELAY_MS);
+              }
+            };
+            new win.MutationObserver(syncBar).observe(urlbar, { attributes: true, attributeFilter: ["focused"] });
+            doc.addEventListener("popuphidden", syncBar);
+            gBrowser.tabContainer.addEventListener("TabSelect", () => {
+              closeBar();
+              leaveStartPage();
+            });
+
+            // A new window (the first one at launch too) starts with the bar
+            // instead of a blank tab. Its empty first tab stays out of the
+            // sidebar ([arc-start-page]) as the page behind the bar: whatever
+            // loads in it makes it a normal tab (Enter loads there), and if
+            // another tab is selected while it's still empty, it's closed.
+            let startPage = null;
+            const keepStartPage = () => {
+              startPage?.removeAttribute("arc-start-page");
+              startPage = null;
+            };
+            function leaveStartPage() {
+              if (!startPage || gBrowser.selectedTab === startPage) {
+                return;
+              }
+              const tab = startPage;
+              startPage = null;
+              if (tab.isConnected && tab.isEmptyIgnoringLoad) {
+                gBrowser.removeTab(tab, { animate: false });
+              } else {
+                tab.removeAttribute("arc-start-page");
+              }
+            }
+            gBrowser.addTabsProgressListener({
+              onLocationChange(browser, webProgress, request, location) {
+                if (startPage && browser === startPage.linkedBrowser &&
+                    webProgress.isTopLevel && !win.isBlankPageURL(location.spec)) {
+                  keepStartPage();
+                }
+              },
+            });
+            // Closing the last open row or tile lands on such a page too (made
+            // here, or the window's current one); the bar opens once it's shown
+            openStartPage = () => {
+              const tab = startPage?.isConnected ? startPage : gBrowser.addTrustedTab(win.BROWSER_NEW_TAB_URL);
+              startPage = tab;
+              tab.setAttribute("arc-start-page", "");
+              win.setTimeout(() => {
+                if (gBrowser.selectedTab === tab && !barOpen()) {
+                  openBar();
+                }
+              }, 0);
+              return tab;
+            };
+            win.SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
+              const tab = gBrowser.selectedTab;
+              if (tab.pinned || isRow(tab) || !tab.isEmptyIgnoringLoad) {
+                return;
+              }
+              startPage = tab;
+              tab.setAttribute("arc-start-page", "");
+              openBar();
+            }, 0));
+          }
         }
-      }
+        return patches;
+      }) ?? {};
+
+      // --- LibreWolf's own code, replaced ---
+      // Everything this script replaces in LibreWolf, in one list: what it
+      // is for, LibreWolf's method, and the new version (in its section
+      // above). If an update renames one, only that feature is off and the
+      // browser console says "Arc sidebar (...): not set up". (Option+click's
+      // link handling is replaced once for the whole app, at the top.)
+      patch("tabs slide shut", gBrowser, "_endRemoveTab", slideShutBeforeRemoving);
+      patch("closing a pinned row or tile resets it", gBrowser, "removeTab", resetInsteadOfClosing);
+      patch("deleting a folder closes its tabs", gBrowser, "removeTabGroup", folderTabsReallyClose);
+      patch("Cmd+W on a tile", win.BrowserCommands, "closeTabOrWindow", closeTilesToo);
+      patch("split view: in the row's spot", gBrowser, "addTabSplitView", splitView.inRowSpot);
+      patch("split view: a row joining", gBrowser, "moveTabToSplitView", splitView.rowJoins);
+      patch("split view: separating glides", splitClass?.prototype, "unsplitTabs", glideApart);
+      patch("folders: loaded tabs stay in view", folderClass?.prototype, "isTabVisibleInGroup", showLoadedTabs);
+      patchProperty("folders: rows slide", folderClass?.prototype, "collapsed", slideFolderRows);
+      patchProperty("+ New Tab while dragging", periphery, "screenY", reportListEnd);
+      patch("drag and drop: no page thumbnail", win.DataTransfer?.prototype, "updateDragImage", noThumbnailForTabs);
+      // (LibreWolf makes the preview cards on first hover)
+      guard("no tab previews while dragging", () => {
+        let patched = false;
+        const whenThere = () => {
+          const panel = gBrowser.tabContainer.previewPanel;
+          if (panel && !patched) {
+            patched = true;
+            gBrowser.tabContainer.removeEventListener("mouseover", whenThere, true);
+            patch("no tab previews while dragging", panel, "shouldActivate", noPreviewsWhileDragging);
+          }
+        };
+        gBrowser.tabContainer.addEventListener("mouseover", whenThere, true);
+        whenThere();
+      });
+      patch("command bar: the address waits", win.gURLBar, "setURI", commandBar.holdAddress);
+      patch("command bar: Enter opens a tab", win.gURLBar?.controller, "whereToOpen", commandBar.enterOpensTab);
 
       // Everything's in place (rows and folders restored or synced, the
       // start page marked: those run on the same signal, earlier): the tab
       // list fades in (see "browser-window-before-show" above)
-      SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
-        win.requestAnimationFrame(() => win.requestAnimationFrame(() => doc.documentElement.removeAttribute("arc-starting")));
-      }, 0));
+      // (without it, the 4s fallback above shows the list)
+      guard("start-up fade", () => {
+        SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
+          win.requestAnimationFrame(() => win.requestAnimationFrame(() => doc.documentElement.removeAttribute("arc-starting")));
+        }, 0));
+      });
     }, "browser-delayed-startup-finished");
   })();
 } catch (e) {
   // Never let a failure here break the rest of librewolf.cfg
   try {
-    console.error("Arc sidebar shortcut:", e);
+    Components.classes["@mozilla.org/consoleservice;1"].getService(Components.interfaces.nsIConsoleService)
+      .logStringMessage(`Arc sidebar: ${e}`);
   } catch {}
 }
 // <<< ARC SIDEBAR SHORTCUT <<<
