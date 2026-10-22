@@ -24,7 +24,7 @@ Nothing queued.
 - Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when Firefox quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (Firefox can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
 - Profile switcher: switching and creating profiles were tested with made-up profiles only (Firefox turns its profiles on only for profiles in its profile list, which the test profiles aren't); the layout and fitting were measured.
 - Tiles can't be split (Firefox keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
-- Dragging a tab in from another window is tested with simulated events only. Real drags were checked by hand-run recordings (`~/.arc-drag`, outside the repo), not in the test suite.
+- Dragging a tab in from another window is tested with simulated events only. Real drags are checked by `tests/drag_tests.py` (it needs `~/.arc-drag/drag`, outside the repo).
 - When a tab leaves the tiles mid-drag, Firefox sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
 - A folder folds up while it's dragged (Firefox's design); the rows above close up and its space waits above the divider until the drop.
 - Firefox's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
@@ -35,6 +35,7 @@ Nothing queued.
 
 ## Done
 
+- [x] `tests/drag_tests.py`: ten real drag-and-drop cases with the real mouse (through `~/.arc-drag/drag`), each checked for where things land and for leftovers (torn-off windows, drag state, offsets, errors, saved state).
 - [x] `doctor.sh`: checks the whole setup in one go (installed files against the repo, restart needed, profiles' chrome link and user.js, automatic updates, iCloud Passwords, uncommitted Betterfox updates) and says how to fix each problem.
 - [x] Tests for empty and unusual states: a brand-new profile's first run and restart, nothing pinned, tiles only, rows only, a scrambled toolbar. Fixed along the way: the divider sat 12px too low with no rows (and was clipped away with tiles only); with nothing pinned there's no divider now.
 - [x] Fixed: with no tiles, dragging a tab to the top never made the first tile (Firefox's pin drop zone opened below the dragged tab, late, and a release above it, where the pointer ends up, landed on the toolbar). The zone is now an empty Arc tile slot that opens at once, and a release just above it counts. Fixed: a profile's saved toolbar could show reload, forward, back; they're put back in order.

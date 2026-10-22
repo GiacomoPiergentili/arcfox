@@ -162,6 +162,12 @@ python3 tests/run_tests.py
 
 Launches Firefox with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, folders opening and closing, tabs sliding and gliding, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Then a brand-new profile without the look (as made from the Profiles menu): its first run links it to this repo and its restart loads the look; and the empty states: nothing pinned (no divider, Cmd+W on the only tab leaves the empty page), tiles only, rows only. Takes about four minutes; `--user-js <file>` runs it on top of a `user.js` (e.g. Betterfox's); prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every Firefox update.
 
+```bash
+python3 tests/drag_tests.py
+```
+
+Real drag and drop, which simulated events miss (Firefox's own drag code, its timers, the pointer leaving the tab list): the real mouse moves in a test window, through `~/.arc-drag/drag` (a small tool outside the repo that refuses unless the test window is frontmost and on top at every point). Ten cases: a tab into the tiles at a spot, tiles reordered, a tile into the rows and down to the normal tabs, a tab into the rows and a row down to the normal tabs, a tab into a folder, a detour over the page and back, a drop on the page making a split view, the first tile with no tiles yet. After each it checks where everything landed, and that no window was torn off, no drag state or offsets are left, the script logged no errors, and the saved tiles and rows match the sidebar. About 2½ minutes, hands off the mouse; `--only <text>` runs some cases, `--record <dir>` films each drag (the test window only). Run it after changes to dragging and after Firefox updates.
+
 ## What's been done
 
 Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
