@@ -174,6 +174,15 @@ try {
           return undefined;
         }
       };
+      // Motion, shared by every animation here: the system's Reduce Motion,
+      // and the curves (settle and leave are userChrome.css's
+      // --arc-ease-open and --arc-ease-close)
+      const reducedMotion = () => win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const CURVE = {
+        settle: "cubic-bezier(0.32, 0.72, 0, 1)", // arriving: fast start, soft landing
+        leave: "cubic-bezier(0.4, 0, 1, 1)", // leaving: accelerates away
+        pop: "cubic-bezier(0.2, 0.9, 0.3, 1)", // Peek's card growing out of a link
+      };
       // LibreWolf's own code that this script replaces goes through here, a
       // method at a time: replace(original) gives the new version, which
       // calls the original as it needs. If an update renamed it, LibreWolf's
@@ -942,8 +951,7 @@ try {
       // rows below follow, as folder rows do), and pinning or unpinning
       // glides it, and whatever makes room, to its new place. Not at launch,
       // during drags (they glide on their own) or with reduced motion.
-      const SETTLE = "cubic-bezier(0.32, 0.72, 0, 1)"; // (the folder rows' curve)
-      const motionOK = () => !win.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+      const motionOK = () => !reducedMotion() &&
         !dragRoot.hasAttribute("arc-starting") && !dragRoot.hasAttribute("arc-dragging");
       // ([arc-folding]: see userChrome.css; height: for a row already hidden,
       // as measured while it was shown)
@@ -964,7 +972,7 @@ try {
           el.removeAttribute("arc-folding");
           done?.();
         };
-        el.animate(open ? [none, full] : [full, none], { id: "arc-fold", duration: open ? 280 : 220, easing: SETTLE })
+        el.animate(open ? [none, full] : [full, none], { id: "arc-fold", duration: open ? 280 : 220, easing: CURVE.settle })
           .finished.then(finish, finish);
       };
       // Closing: LibreWolf selects the next tab at once and removes the row
@@ -1031,12 +1039,24 @@ try {
         ...gBrowser.tabContainer.querySelectorAll(".tabbrowser-tab:not([closing]), .tab-group-label-container, tab-split-view-wrapper"),
         doc.getElementById("tabbrowser-arrowscrollbox-periphery"),
       ].filter(Boolean);
-      // (where each item is, and whether it's a tile)
-      const notePlaces = () => (motionOK() ? new Map(glideItems().map(el => [el, [el.getBoundingClientRect(), !!el.pinned]])) : null);
+      // (where each item is, and whether it's a tile. A drop glides too,
+      // except the dropped tab, which LibreWolf moves into place itself.)
+      const notePlaces = ({ dropping = false } = {}) => {
+        if (reducedMotion() || dragRoot.hasAttribute("arc-starting") || (!dropping && dragRoot.hasAttribute("arc-dragging"))) {
+          return null;
+        }
+        const items = glideItems().filter(el => !(dropping && el.hasAttribute("dragtarget") && !el.pinned));
+        return new Map(items.map(el => [el, [el.getBoundingClientRect(), !!el.pinned]]));
+      };
       // (measured right away, so the first frame drawn is already the start
-      // of the glide, never the end)
-      const glideFrom = places => {
+      // of the glide, never the end; after a drop, a frame later: LibreWolf
+      // moves the tabs once our drop handler is done)
+      const glideFrom = (places, { nextFrame = false } = {}) => {
         if (!places) {
+          return;
+        }
+        if (nextFrame) {
+          win.requestAnimationFrame(() => glideFrom(places));
           return;
         }
         const moves = [];
@@ -1057,7 +1077,7 @@ try {
             // (once the others have mostly made room for it)
             // (opacity replaced, not added: added to 1 it would stay 1)
             el.animate([{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "none" }],
-              { duration: 280, delay: 120, fill: "backwards", easing: SETTLE });
+              { duration: 280, delay: 120, fill: "backwards", easing: CURVE.settle });
             continue;
           }
           // One that changed size too (a tile widening or narrowing as
@@ -1075,7 +1095,7 @@ try {
               from.clipPath = `inset(0 ${grewX}px ${grewY}px 0)`;
               to.clipPath = "inset(0 0 0 0)";
             }
-            const anim = el.animate([from, to], { duration: 320, easing: SETTLE, composite: "add" });
+            const anim = el.animate([from, to], { duration: 320, easing: CURVE.settle, composite: "add" });
             if (el === crossing) {
               el.setAttribute("arc-gliding", "");
               const done = () => el.removeAttribute("arc-gliding");
@@ -1637,34 +1657,6 @@ try {
           tilesContainer()?.removeAttribute("arc-tiles-growing");
         }
       };
-      // Whatever still moves when a drop lands (the tile grid shrinking, a
-      // folder opening again) glides there instead of jumping
-      const glide = () => {
-        const items = [
-          // (the dropped item too when LibreWolf doesn't animate it into place
-          // itself: a tile becoming a row, a folder)
-          ...gBrowser.tabContainer.querySelectorAll(".tabbrowser-tab:not([pinned]):not([dragtarget]), .tabbrowser-tab[pinned][dragtarget], .tab-group-label-container, tab-split-view-wrapper"),
-          periphery,
-        ].filter(Boolean);
-        if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          return;
-        }
-        const before = new Map(items.map(el => [el, el.getBoundingClientRect().top]));
-        // (before the next frame is drawn; transform, as + New Tab's translate
-        // is fixed in userChrome.css)
-        win.requestAnimationFrame(() => {
-          for (const [el, top] of before) {
-            const dy = top - el.getBoundingClientRect().top;
-            if (el.isConnected && Math.abs(dy) >= 4 && Math.abs(dy) < 400) {
-              el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], {
-                duration: 200,
-                easing: "cubic-bezier(0.2, 0, 0, 1)",
-                composite: "add",
-              });
-            }
-          }
-        });
-      };
       const placeAt = (tab, y, moving) => {
         // between two items of an open folder: into the folder, there
         const groupOf = el => el.localName === "tab" ? el.group : el.closest("tab-group");
@@ -1791,7 +1783,9 @@ try {
             return;
           }
           const dragged = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-          glide();
+          // whatever still moves when it lands (the tile grid shrinking, a
+          // folder opening again) glides there instead of jumping
+          glideFrom(notePlaces({ dropping: true }), { nextFrame: true });
           // A split view: dropped above the line, its pages become pinned rows
           // (one that has a row already stays as it is); below it, normal tabs
           if (isSplit(dragged) && gBrowser.splitViews.includes(dragged)) {
@@ -2212,7 +2206,7 @@ try {
         if (motionOK()) {
           tab.querySelector(".tab-stack")?.animate(
             [{ opacity: 0.2, transform: "scale(0.94)" }, { opacity: 1, transform: "none" }],
-            { duration: 360, easing: SETTLE });
+            { duration: 360, easing: CURVE.settle });
         }
         // never left marked as the tab on screen (see below)
         if (!tab.selected && tab.hasAttribute("visuallyselected")) {
@@ -2380,8 +2374,6 @@ try {
           const r = gBrowser.tabpanels.getBoundingClientRect();
           return { left: r.left + r.width * 0.075, top: r.top + r.height * 0.075, width: r.width * 0.85, height: r.height * 0.85 };
         };
-        const reducedMotion = () => win.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const EASE = "cubic-bezier(0.2, 0.9, 0.3, 1)"; // fast start, soft landing
         // (from where the card ends up, 7.5% in from the page's edges: it's
         // still growing into place when this runs)
         const placePeekBar = () => {
@@ -2453,7 +2445,7 @@ try {
               card.animate(peek.origin
                 ? [{ transform: "scale(0.1)", opacity: 0 }, { opacity: 1, offset: 0.25 }, { transform: "scale(1)", opacity: 1 }]
                 : [{ transform: "scale(0.96)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }],
-              { duration: peek.origin ? 340 : 220, easing: EASE });
+              { duration: peek.origin ? 340 : 220, easing: CURVE.pop });
             }
             peekBar.setAttribute("shown", "");
             placePeekBar();
@@ -2505,10 +2497,10 @@ try {
               const box = cardBox();
               const r = gBrowser.tabpanels.getBoundingClientRect();
               card.style.transformOrigin = `${r.left + r.width / 2 - box.left}px ${r.top + r.height / 2 - box.top}px`;
-              anim = card.animate([{ transform: "scale(1)" }, { transform: `scale(${r.width / box.width}, ${r.height / box.height})`, borderRadius: "0px" }], { duration: 240, easing: EASE, fill: "forwards" });
+              anim = card.animate([{ transform: "scale(1)" }, { transform: `scale(${r.width / box.width}, ${r.height / box.height})`, borderRadius: "0px" }], { duration: 240, easing: CURVE.pop, fill: "forwards" });
             } else {
               card.style.transformOrigin = peek.origin ? `${peek.origin.x}px ${peek.origin.y}px` : "center";
-              anim = card.animate([{ transform: "scale(1)", opacity: 1 }, { opacity: 1, offset: 0.5 }, { transform: peek.origin ? "scale(0.1)" : "scale(0.96)", opacity: 0 }], { duration: 220, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+              anim = card.animate([{ transform: "scale(1)", opacity: 1 }, { opacity: 1, offset: 0.5 }, { transform: peek.origin ? "scale(0.1)" : "scale(0.96)", opacity: 0 }], { duration: 220, easing: CURVE.leave, fill: "forwards" });
             }
             under?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-out", fill: "forwards", pseudoElement: "::after" });
             anim.finished.catch(() => {}).then(() => {
@@ -3222,13 +3214,13 @@ try {
               }
               loading = false;
               const bar = doc.getElementById("urlbar");
-              if (!bar || win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+              if (!bar || reducedMotion()) {
                 backInSidebar(revert);
                 return;
               }
               root.setAttribute("arc-newtab-fading", "");
               const anim = bar.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.97 }],
-                { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+                { duration: 160, easing: CURVE.leave, fill: "forwards" });
               fading = anim;
               anim.finished.then(() => fading === anim && backInSidebar(revert), () => {});
             };
