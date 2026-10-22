@@ -62,5 +62,4 @@ Nothing queued.
 - [x] Cmd+1…9 go to the tiles in order, then the pinned rows.
 - [x] Folders: a collapsed folder keeps showing its loaded tabs (no "+N"); rows slide open and shut; the folder icon's front tilts open and shuts.
 - [x] Motion: tabs slide open and shut; Cmd+D / Cmd+Shift+D and Pin / Unpin glide everything to its new place (a tab changing shape grows into it); closing a pinned row or tile settles it back in place.
-
 - [x] More motion: a selected tile's colors fade in and out; the away dot pops in; split views glide together and apart; other windows glide when they follow a change.
