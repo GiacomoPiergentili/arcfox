@@ -2735,7 +2735,14 @@ try {
               return;
             }
             win.clearTimeout(followTimer);
-            followTimer = win.setTimeout(() => rowsRestored && saveTimer === null && reconcile(), 150);
+            // (what moves here glides there, as for a change made here)
+            followTimer = win.setTimeout(() => {
+              if (rowsRestored && saveTimer === null) {
+                const places = notePlaces();
+                reconcile();
+                glideFrom(places);
+              }
+            }, 150);
           },
         };
         prefs.addObserver(ROWS_PREF, sharedObserver);
@@ -2776,6 +2783,33 @@ try {
           backItem.hidden = !show;
           setItem.hidden = !show;
         });
+      }
+
+      // --- motion: split views ---
+      // Two tabs joining or separating glide into place, with whatever moves
+      // for them (see "motion" above; not during drags, which glide on their
+      // own)
+      const addTabSplitViewUnglided = gBrowser.addTabSplitView.bind(gBrowser);
+      gBrowser.addTabSplitView = (...args) => {
+        const places = notePlaces();
+        try {
+          return addTabSplitViewUnglided(...args);
+        } finally {
+          glideFrom(places);
+        }
+      };
+      const splitClass = win.customElements.get("tab-split-view-wrapper");
+      if (splitClass && !splitClass.prototype._arcGlide) {
+        splitClass.prototype._arcGlide = true;
+        const unsplitTabs = splitClass.prototype.unsplitTabs;
+        splitClass.prototype.unsplitTabs = function (...args) {
+          const places = notePlaces();
+          try {
+            return unsplitTabs.apply(this, args);
+          } finally {
+            glideFrom(places);
+          }
+        };
       }
 
       // --- Tile colors (as in Zen) ---

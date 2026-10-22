@@ -558,16 +558,31 @@ sidebar-main {
    three colors over the usual selected fill, and a hairline in the main
    color (--arc-tile-c1..c3 and [arc-tile-colored] come from the script; an
    icon without a clear color keeps the neutral selection above) */
-#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned][arc-tile-colored]:is([selected], [multiselected]) .tab-background {
+/* (the colors are a layer of their own over the tile's fill, which fades
+   in and out as the tile is selected and left: gradients can't fade) */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned][arc-tile-colored] .tab-background {
   --arc-tile-c2-or: var(--arc-tile-c2, var(--arc-tile-c1));
   --arc-tile-c3-or: var(--arc-tile-c3, var(--arc-tile-c2-or));
-  background:
-    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--arc-tile-c1) 18%, transparent), transparent 70%),
-    radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--arc-tile-c3-or) 12%, transparent), transparent 70%),
-    linear-gradient(135deg, color-mix(in srgb, var(--arc-tile-c1) 7%, transparent), color-mix(in srgb, var(--arc-tile-c2-or) 9%, transparent)),
-    var(--arc-fill-selected) !important;
-  outline: 1px solid color-mix(in srgb, var(--arc-tile-c1) 75%, transparent) !important;
-  outline-offset: -1px !important;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--arc-tile-c1) 18%, transparent), transparent 70%),
+      radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--arc-tile-c3-or) 12%, transparent), transparent 70%),
+      linear-gradient(135deg, color-mix(in srgb, var(--arc-tile-c1) 7%, transparent), color-mix(in srgb, var(--arc-tile-c2-or) 9%, transparent));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--arc-tile-c1) 75%, transparent);
+    opacity: 0;
+    transition: opacity var(--arc-close-duration) var(--arc-ease-open);
+    pointer-events: none;
+  }
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned][arc-tile-colored]:is([selected], [multiselected]) .tab-background::after {
+  opacity: 1;
 }
 
 /* Pinned page dot: a pinned row or tile that's away from the page it was
@@ -602,6 +617,18 @@ sidebar-main {
 
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[arc-away] .arc-home-dot {
   display: flex;
+
+  /* it pops in when the tab leaves its pinned page */
+  &::before {
+    animation: arc-dot-in var(--arc-open-duration) var(--arc-ease-open) both;
+  }
+}
+
+@keyframes arc-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
 }
 
 /* on a tile: in its top right corner */

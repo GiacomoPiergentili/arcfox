@@ -29,11 +29,7 @@ Nothing queued.
 - LibreWolf's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
 - `restoreRows` still converts rows saved by an early version (when rows were LibreWolf pinned tabs); it doubles as crash recovery, so it stays.
 
-## Animation ideas (proposed 2026-10-22, not started)
-- Selecting a tile: its colors fade in instead of switching at once (check first whether they already do).
-- A pinned row's "away" dot pops in softly when the row leaves its pinned page.
-- Split view: two tabs joining or separating in the sidebar glide into place instead of rearranging at once.
-- Other windows staying in sync: when a tile, row or folder is pinned, moved or removed in one window, the others glide to match.
+## Animation ideas
 - Left alone on purpose: switching tabs and hover stay instant / near-instant; page loading and the Downloads progress are LibreWolf's own.
 
 ## Done
@@ -66,3 +62,5 @@ Nothing queued.
 - [x] Cmd+1…9 go to the tiles in order, then the pinned rows.
 - [x] Folders: a collapsed folder keeps showing its loaded tabs (no "+N"); rows slide open and shut; the folder icon's front tilts open and shuts.
 - [x] Motion: tabs slide open and shut; Cmd+D / Cmd+Shift+D and Pin / Unpin glide everything to its new place (a tab changing shape grows into it); closing a pinned row or tile settles it back in place.
+
+- [x] More motion: a selected tile's colors fade in and out; the away dot pops in; split views glide together and apart; other windows glide when they follow a change.

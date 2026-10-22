@@ -452,6 +452,26 @@ gBrowser.selectedTab = row; await wait(500);
 gBrowser.removeTab(row);
 const op = []; for (let i = 0; i < 30; i++) { await frame(); op.push(Number(getComputedStyle(row.querySelector(".tab-stack")).opacity)); }
 check(row.isConnected && op.some(o => o < 0.6) && op.at(-1) === 1, "closing a pinned row resets it with a settle: " + op.map(o => o.toFixed(1)).join(","));
+const red = tiles().find(t => t.hasAttribute("arc-tile-colored"));
+const tint = () => Number(getComputedStyle(red.querySelector(".tab-background"), "::after").opacity);
+gBrowser.selectedTab = gBrowser.tabs.find(x => x.label === "Normal 2"); await wait(500);
+gBrowser.selectedTab = red;
+const fade = []; for (let i = 0; i < 20; i++) { await frame(); fade.push(tint()); }
+check(fade.some(o => o > 0.05 && o < 0.95) && fade.at(-1) === 1, "a selected tile's colors fade in: " + fade.map(o => o.toFixed(2)).join(","));
+gBrowser.selectedTab = gBrowser.tabs.find(x => x.label === "Normal 2"); await wait(500);
+check(tint() === 0, "...and out");
+check(getComputedStyle(document.querySelector(".arc-home-dot") || document.documentElement, "::before").animationName.includes("arc-dot-in") || !document.querySelector(".arc-home-dot"), "the away dot pops in");
+const a = gBrowser.addTab("about:robots", {triggeringPrincipal: P}), b = gBrowser.addTab("about:mozilla", {triggeringPrincipal: P});
+await wait(800);
+gBrowser.addTabSplitView([a, b]);
+await frame(); await frame();
+check(a.getAnimations().length + b.getAnimations().length > 0, "two tabs splitting grow into place");
+await wait(500);
+a.splitview.unsplitTabs();
+await frame(); await frame();
+check(a.getAnimations().length + b.getAnimations().length > 0, "...and separating too");
+await wait(500);
+gBrowser.removeTab(a, {animate: false}); gBrowser.removeTab(b, {animate: false}); await wait(500);
 return result({});
 """),
 
