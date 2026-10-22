@@ -12,7 +12,7 @@
             !sidebar.hasAttribute("sidebar-launcher-expanded");
           const engineMenuOpen = () =>
             !!urlbar.querySelector(".searchmode-switcher-panel-list:is([open], [showing])");
-          // LibreWolf briefly takes focus away while the sidebar hides, so a
+          // Firefox briefly takes focus away while the sidebar hides, so a
           // focus loss only ends the floating edit if it lasts a moment
           const END_DELAY_MS = 150;
           let endTimer = null;
@@ -104,7 +104,7 @@
               }
               const revert = !loading;
               root.removeAttribute("arc-newtab-bar");
-              // After Enter, LibreWolf handles the address and the focus
+              // After Enter, Firefox handles the address and the focus
               if (!loading && gURLBar.focused) {
                 gBrowser.selectedBrowser.focus();
               }
@@ -134,7 +134,7 @@
               // don't belong to the new tab
               gURLBar.setPageProxyState("invalid", true);
             };
-            // Our listener on the commands themselves runs before LibreWolf's
+            // Our listener on the commands themselves runs before Firefox's
             // (on the command set), which would open a tab
             const toggleBar = e => {
               e.stopPropagation();
@@ -142,7 +142,7 @@
               // closed it by taking the focus: that click means "close". Only
               // then (a keyboard Cmd+T right after Enter or Esc always opens).
               // (a click comes from the + New Tab button, a key press from its
-              // key; LibreWolf doesn't reliably say which input it was, so look
+              // key; Firefox doesn't reliably say which input it was, so look
               // at what sent the command, through the chain of source events)
               let byMouse = false;
               for (let ev = e, depth = 0; ev && depth < 4; ev = ev.sourceEvent, depth++) {
@@ -159,7 +159,7 @@
             for (const command of newTabCommands) {
               command.addEventListener("command", toggleBar);
             }
-            // While the bar is open, LibreWolf's address updates (e.g. the tab
+            // While the bar is open, Firefox's address updates (e.g. the tab
             // opened by the previous Enter finishing its load) would fill the
             // empty bar with that tab's address: they wait until it closes
             patches.holdAddress = original => function (...args) {
@@ -191,7 +191,7 @@
                 closeBar();
               }
             }, true);
-            // Focus leaving for a moment (not just LibreWolf's brief drop while
+            // Focus leaving for a moment (not just Firefox's brief drop while
             // the sidebar moves) closes it; so does switching tabs
             const syncBar = () => {
               if (!barOpen()) {

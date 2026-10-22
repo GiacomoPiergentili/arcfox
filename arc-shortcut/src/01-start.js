@@ -1,9 +1,9 @@
 // >>> ARC SIDEBAR SHORTCUT >>>
-// Appended to librewolf.cfg by arc-shortcut/install.sh, which joins
+// Appended to firefox.cfg by arc-shortcut/install.sh, which joins
 // arc-shortcut/src/*.js in order into this one script. The files are pieces
 // of it, not modules: 01 opens the per-window set-up (and its guard /
 // patch helpers), each following file is one feature's section of it, and
-// the last lists every replacement of LibreWolf's code and closes it.
+// the last lists every replacement of Firefox's code and closes it.
 // Cmd+S switches the sidebar between "always show" and "expand on hover".
 // A sidebar button next to the window buttons does the same; no sidebar gear.
 // Cmd+D toggles a pinned row, Cmd+Shift+D a favorite tile (Arc-style).
@@ -37,8 +37,8 @@ try {
       } catch {}
     };
     // Dragging a tab onto another one reorders it (as in Arc) instead of
-    // pausing to create a tab group. Set here: LibreWolf's own defaults load
-    // after the app's defaults/pref files and would override it there.
+    // pausing to create a tab group. (Defaults the script relies on are set
+    // here, so they come with it and need no pref file of their own.)
     const defaults = Cc["@mozilla.org/preferences-service;1"]
       .getService(Ci.nsIPrefService)
       .getDefaultBranch("");
@@ -53,14 +53,17 @@ try {
     // tile's page at launch made start-up slow and busy (and left the tiles
     // blank while they loaded)
     defaults.setBoolPref("browser.sessionstore.restore_pinned_tabs_on_demand", true);
-    // No LibreWolf tool buttons (Bookmarks, History...) in the sidebar's
+    // No Firefox tool buttons (Bookmarks, History...) in the sidebar's
     // bottom row: it has Downloads, the profiles and Extensions. Taken out
     // of the list before the first window is drawn, so they're never made
     // (hiding them from the window's own set-up let them flash at launch).
     // Extensions' sidebar buttons (ids with @ or {) stay listed. (And a new
-    // profile doesn't get LibreWolf's starter set of them: that's for
+    // profile doesn't get Firefox's starter set of them: that's for
     // profiles that haven't "used the new sidebar" yet.)
     defaults.setBoolPref("sidebar.new-sidebar.has-used", true);
+    // Downloads always sits at the left of the sidebar's bottom row (Firefox
+    // would hide it until there's a download)
+    defaults.setBoolPref("browser.download.autohideButton", false);
     try {
       const userPrefs = Cc["@mozilla.org/preferences-service;1"]
         .getService(Ci.nsIPrefService)
@@ -72,10 +75,10 @@ try {
       }
     } catch (e) {}
 
-    // No "Customize sidebar" gear or LibreWolf tool buttons in the sidebar's
+    // No "Customize sidebar" gear or Firefox tool buttons in the sidebar's
     // bottom row (they live in the sidebar's shadow DOM, which userChrome.css
     // can't reach). Its settings stay in Settings > General > Browser layout.
-    // Without the gear LibreWolf shows a "More tools" button, with nothing to
+    // Without the gear Firefox shows a "More tools" button, with nothing to
     // show in it. Done before the window is first shown (doing it in the
     // window's own set-up, after it's drawn, let the gear flash at launch).
     // Any tool button that still turns up (an extension's) is invisible but
@@ -97,7 +100,7 @@ try {
           .tools-and-extensions moz-button { visibility: hidden !important; }
           .tools-and-extensions { gap: 4px !important; padding-inline-start: 9px !important; }
           .tools-and-extensions moz-button {
-            --button-size-icon: 30px !important; /* LibreWolf sizes them from the tab height */
+            --button-size-icon: 30px !important; /* Firefox sizes them from the tab height */
             --button-border-radius: var(--arc-radius-inner) !important;
             --button-background-color-ghost-hover: var(--arc-fill-hover) !important;
             --button-background-color-ghost-active: var(--arc-fill-selected) !important;
@@ -128,12 +131,12 @@ try {
     }, "browser-window-before-show");
 
     // Option+click on a link in a page opens it in Peek, from any tab (as in
-    // Zen). LibreWolf does nothing with it otherwise (no navigation, no
+    // Zen). Firefox does nothing with it otherwise (no navigation, no
     // download): where a clicked link opens is decided in BrowserUtils, so
     // the click asks for a new tab in front, which the window then shows as a
     // Peek (see "Peek" below). Only clicks in pages: bookmarks, menus and the
     // URL bar keep their own meaning for Option. Set up once the first
-    // window is open: loading LibreWolf's modules this early in start-up
+    // window is open: loading Firefox's modules this early in start-up
     // (this file runs before almost anything) could stall it.
     let altPeekAt = 0;
     let altPeekHooked = false;
@@ -166,7 +169,7 @@ try {
 
     obs.addObserver(win => {
       const doc = win.document;
-      // Each feature sets itself up on its own: if a LibreWolf update breaks
+      // Each feature sets itself up on its own: if a Firefox update breaks
       // one (a renamed element or function), only that feature is missing,
       // and the browser console says which. (Its helpers are plain
       // definitions, which can't fail, so they stay outside.)
@@ -190,9 +193,9 @@ try {
         leave: "cubic-bezier(0.4, 0, 1, 1)", // leaving: accelerates away
         pop: "cubic-bezier(0.2, 0.9, 0.3, 1)", // Peek's card growing out of a link
       };
-      // LibreWolf's own code that this script replaces goes through here, a
+      // Firefox's own code that this script replaces goes through here, a
       // method at a time: replace(original) gives the new version, which
-      // calls the original as it needs. If an update renamed it, LibreWolf's
+      // calls the original as it needs. If an update renamed it, Firefox's
       // stays as it is and only that feature is off.
       const patch = (name, owner, method, replace) => guard(name, () => {
         const original = owner?.[method];
@@ -200,11 +203,11 @@ try {
           throw new Error("its section isn't set up");
         }
         if (typeof original !== "function") {
-          throw new Error(`LibreWolf's ${method} isn't there any more`);
+          throw new Error(`Firefox's ${method} isn't there any more`);
         }
         owner[method] = replace(original);
       });
-      // (the same for a property LibreWolf gives a getter and setter, looked
+      // (the same for a property Firefox gives a getter and setter, looked
       // up along the owner's prototypes: replace(descriptor) gives the new one)
       const patchProperty = (name, owner, prop, replace) => guard(name, () => {
         if (typeof replace !== "function") {
@@ -215,14 +218,14 @@ try {
           descriptor = Object.getOwnPropertyDescriptor(o, prop);
         }
         if (!descriptor?.get) {
-          throw new Error(`LibreWolf's ${prop} isn't there any more`);
+          throw new Error(`Firefox's ${prop} isn't there any more`);
         }
         Object.defineProperty(owner, prop, { configurable: true, ...replace(descriptor) });
       });
       // Marks the window as running this script: userChrome.css shows a
-      // notice when it's missing (e.g. after a LibreWolf update replaced it)
+      // notice when it's missing (e.g. after a Firefox update replaced it)
       doc.documentElement.setAttribute("arc-script", "");
-      // (a window is open: LibreWolf is far enough along for this)
+      // (a window is open: Firefox is far enough along for this)
       win.setTimeout(hookAltPeek, 0);
       // A profile's first run with this setup: the settings the layout relies
       // on, once; what you change later stays. (A profile without the look
@@ -246,8 +249,27 @@ try {
           setIfDefault("browser.newtabpage.enabled", false);
           setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
           setIfDefault("sidebar.new-sidebar.has-used", true);
+          // The toolbar buttons the layout places (back, forward and reload
+          // at the top, Downloads and Extensions in the bottom row): a new
+          // Firefox profile with vertical tabs leaves reload and Downloads out
+          try {
+            const { CustomizableUI } = win;
+            const place = (id, before) => {
+              if (!CustomizableUI.getPlacementOfWidget(id)) {
+                const at = before && CustomizableUI.getPlacementOfWidget(before);
+                CustomizableUI.addWidgetToArea(id, CustomizableUI.AREA_NAVBAR, at?.area === CustomizableUI.AREA_NAVBAR ? at.position : undefined);
+              }
+            };
+            place("back-button", "urlbar-container");
+            place("forward-button", "urlbar-container");
+            place("stop-reload-button", "urlbar-container");
+            place("downloads-button");
+            place("unified-extensions-button");
+          } catch (e) {
+            report("toolbar buttons", e);
+          }
           prefs.setBoolPref("arc.profileDefaultsApplied", true);
-          // A profile without the look (made from LibreWolf's Profiles menu):
+          // A profile without the look (made from Firefox's Profiles menu):
           // its chrome folder becomes a link to this repo, and the settings
           // that load it go on; it shows from the next start (offered below)
           try {
@@ -270,7 +292,7 @@ try {
               }
               win.setTimeout(() => {
                 win.gNotificationBox?.appendNotification("arc-restart", {
-                  label: "This profile is set up for the Arc sidebar. Restart LibreWolf to see it.",
+                  label: "This profile is set up for the Arc sidebar. Restart Firefox to see it.",
                   priority: win.gNotificationBox.PRIORITY_INFO_HIGH,
                 }, [{
                   label: "Restart",
@@ -316,9 +338,9 @@ try {
       // before the window was shown)
       guard("bottom row", () => styleSidebarMain(doc));
 
-      // Tiles stay a grid with the sidebar on auto-hide too (LibreWolf turns
+      // Tiles stay a grid with the sidebar on auto-hide too (Firefox turns
       // them into a list there): the grid lives inside the pinned area's
-      // shadow DOM, which userChrome.css can't reach. Same values LibreWolf
+      // shadow DOM, which userChrome.css can't reach. Same values Firefox
       // uses for the pinned sidebar.
       guard("tile grid", () => {
         const pinnedArea = doc.getElementById("pinned-tabs-container");
@@ -332,7 +354,7 @@ try {
               padding-inline: var(--tab-container-margin-inline-pinned-expanded) !important;
             }
             /* a tile sliding into a new line while a tab is dragged over the
-               tiles (LibreWolf fixes this box's height during drags) */
+               tiles (Firefox fixes this box's height during drags) */
             :host([arc-tiles-growing]) [part~="scrollbox"] {
               overflow: visible !important;
             }`;

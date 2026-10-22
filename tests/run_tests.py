@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Regression tests for librewolf-arc.
+"""Regression tests for arcfox.
 
-Launches LibreWolf with a fresh, throwaway profile that uses this repo's
-userChrome.css, drives it through Marionette (LibreWolf's built-in remote
+Launches Firefox with a fresh, throwaway profile that uses this repo's
+userChrome.css, drives it through Marionette (Firefox's built-in remote
 control) and checks the key behaviors: layout and spacing, tile colors, the
 Cmd+T bar, shortcuts, closing rules, auto-hide tiles, the sidebar color
 measurement, rows and folders across a restart, and auto-archive.
 
-Requirements: LibreWolf in /Applications and the script installed into it
+Requirements: Firefox in /Applications and the script installed into it
 (arc-shortcut/install.sh). Nothing else: Python 3 standard library only.
 Your own profile is never touched; the test profile is deleted afterwards.
 
     python3 tests/run_tests.py            # all tests, about 2 minutes
     python3 tests/run_tests.py --keep     # keep the test profile (prints its path)
+    python3 tests/run_tests.py --user-js path/to/user.js
+                                          # on top of a user.js (e.g. Betterfox's)
 
 Exit code 0 when everything passes, 1 otherwise.
 """
@@ -25,9 +27,9 @@ import sys
 import tempfile
 import time
 
-APP = "/Applications/LibreWolf.app/Contents/MacOS/librewolf"
+APP = "/Applications/Firefox.app/Contents/MacOS/firefox"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = 2839  # its own port, so it never talks to another LibreWolf
+PORT = 2839  # its own port, so it never talks to another Firefox
 
 PREFS = {
     "marionette.port": PORT,
@@ -40,6 +42,19 @@ PREFS = {
     "browser.tabs.warnOnClose": False,
     "browser.translations.automaticallyPopup": False,
     "datareporting.policy.dataSubmissionEnabled": False,
+    # (Firefox's first-run pages and prompts, which LibreWolf doesn't have)
+    "browser.startup.homepage_override.mstone": "ignore",
+    "startup.homepage_welcome_url": "",
+    "startup.homepage_welcome_url.additional": "",
+    "datareporting.policy.firstRunURL": "",
+    "datareporting.policy.dataSubmissionPolicyBypassNotification": True,
+    "toolkit.telemetry.reportingpolicy.firstRun": False,
+    "termsofuse.bypassNotification": True,
+    "app.update.auto": False,
+    "app.normandy.enabled": False,
+    "messaging-system.rsexperimentloader.enabled": False,
+    "browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features": False,
+    "browser.newtabpage.activity-stream.asrouter.userprefs.cfr.addons": False,
 }
 
 
@@ -365,7 +380,7 @@ return result({});
 
     ("profile switcher: bottom row, centered", r"""
 const box = document.getElementById("arc-profiles");
-check(box && box.hidden, "hidden when LibreWolf's profiles are off (a test profile isn't registered)");
+check(box && box.hidden, "hidden when Firefox's profiles are off (a test profile isn't registered)");
 const fake = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => ({id: i, name: "P" + i, avatar: "book", hasCustomAvatar: false, theme: {themeBg: "rgb(120, 190, 255)", themeFg: "rgb(0, 30, 60)"}}));
 await box._arcRender(fake, fake[8]); await wait(300);
 const sb = R(document.querySelector("sidebar-main")), dl = R(document.getElementById("downloads-button")), ext = R(document.getElementById("unified-extensions-button"));
@@ -378,7 +393,7 @@ check(near(b[0].y + b[0].h / 2, dl.y + dl.h / 2, 1), "in line with Downloads");
 check(dl.x - sb.x < 20 && sb.r - ext.r < 20, "Downloads at the left end, Extensions at the right");
 check(b[0].x > dl.r && b.at(-1).r < ext.x, "between them, clear of both");
 const tools = [...(document.querySelector("sidebar-main").shadowRoot?.querySelectorAll(".tools-and-extensions moz-button") || [])];
-check(tools.every(t => getComputedStyle(t).visibility === "hidden"), "LibreWolf's tool buttons (Bookmarks, History) aren't shown: " + tools.length);
+check(tools.every(t => getComputedStyle(t).visibility === "hidden"), "Firefox's tool buttons (Bookmarks, History) aren't shown: " + tools.length);
 check(!/(^|,)(bookmarks|history|syncedtabs|aichat)(,|$)/.test(Services.prefs.getStringPref("sidebar.main.tools", "")), "...and aren't even made (they flashed at launch): " + Services.prefs.getStringPref("sidebar.main.tools", ""));
 check(!document.getElementById("downloads-button").hidden || getComputedStyle(document.getElementById("downloads-button")).display !== "none", "Downloads is shown from the start");
 InspectorUtils.addPseudoClassLock(document.getElementById("downloads-button"), ":hover"); await wait(300);
@@ -621,12 +636,16 @@ return result({});
 # ---------------------------------------------------------------- runner
 def write_prefs(profile):
     with open(os.path.join(profile, "user.js"), "w") as f:
+        # (the tests' own prefs come after, so they win)
+        if "--user-js" in sys.argv:
+            with open(sys.argv[sys.argv.index("--user-js") + 1]) as base:
+                f.write(base.read() + "\n")
         for key, value in PREFS.items():
             f.write("user_pref(%s, %s);\n" % (json.dumps(key), json.dumps(value)))
 
 
 def launch(profile, attempt=1):
-    log = open(os.path.join(profile, "librewolf.log"), "w")
+    log = open(os.path.join(profile, "firefox.log"), "w")
     proc = subprocess.Popen([APP, "-profile", profile, "-no-remote", "--marionette",
                              "--remote-allow-system-access", "about:blank"],
                             stdout=log, stderr=subprocess.STDOUT)
@@ -639,7 +658,7 @@ def launch(profile, attempt=1):
     time.sleep(4)
     mn = Marionette()
     # A brand-new profile now and then starts without userChrome.css (a
-    # LibreWolf start-up quirk, not ours): start it again rather than test
+    # Firefox start-up quirk, not ours): start it again rather than test
     # without the look
     loaded = mn.js("return !!getComputedStyle(root).getPropertyValue('--arc-tab-height');")
     if not loaded and attempt < 3:
@@ -681,8 +700,8 @@ def run(mn, tests, results):
 
 def main():
     if not os.path.exists(APP):
-        sys.exit("LibreWolf not found at " + APP)
-    profile = tempfile.mkdtemp(prefix="librewolf-arc-test-")
+        sys.exit("Firefox not found at " + APP)
+    profile = tempfile.mkdtemp(prefix="arcfox-test-")
     os.symlink(REPO, os.path.join(profile, "chrome"))
     write_prefs(profile)
     print("Test profile:", profile)

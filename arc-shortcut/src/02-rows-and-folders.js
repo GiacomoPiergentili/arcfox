@@ -1,12 +1,12 @@
       // Favorite tiles, pinned rows and folders (Arc-style).
-      //   Tiles are LibreWolf's own pinned tabs (Cmd+Shift+D).
+      //   Tiles are Firefox's own pinned tabs (Cmd+Shift+D).
       //   Pinned rows are normal tabs marked [arc-pinned-row], always kept at
       //   the top of the tab list above the divider (Cmd+D). Folders are
-      //   LibreWolf's tab groups, kept in that same pinned block; their tabs
+      //   Firefox's tab groups, kept in that same pinned block; their tabs
       //   are pinned rows too. The script saves the block (pref
       //   arc.pinnedRows) and reopens it, unloaded, at startup. Closing a row
       //   unloads it but keeps it.
-      // Keeping rows out of LibreWolf's pinned grid lets its own drag and
+      // Keeping rows out of Firefox's pinned grid lets its own drag and
       // drop work: dragging between rows and normal tabs is plain reordering.
       const gBrowser = win.gBrowser;
       const SessionStore = win.SessionStore;
@@ -15,7 +15,7 @@
       const ROWS_PREF = "arc.pinnedRows";
       const isRow = tab => tab.hasAttribute(ROW);
       const isGroup = el => el?.localName === "tab-group";
-      // Split views (two pages side by side) are LibreWolf's
+      // Split views (two pages side by side) are Firefox's
       // <tab-split-view-wrapper>s. One with a pinned row in it is part of the
       // pinned block, in the row's spot; the normal tab next to the row is a
       // guest ([arc-split-guest]): never saved, and back with the normal tabs
@@ -70,7 +70,7 @@
         scheduleSave();
       };
       // The tab list's own items, in order: tabs, folders (and split views),
-      // without LibreWolf's end-of-list box
+      // without Firefox's end-of-list box
       const listItems = () =>
         [...gBrowser.tabContainer.arrowScrollbox.children].filter(el => el.id !== "tabbrowser-arrowscrollbox-periphery");
       // The pinned block: rows and folders, always together at the top
@@ -86,7 +86,7 @@
         }
       };
       // Folder tabs are rows; stray rows/folders go back into the block.
-      // Run after anything that may have broken that (LibreWolf adds tabs to
+      // Run after anything that may have broken that (Firefox adds tabs to
       // folders and creates folders where it likes).
       let normalizing = false;
       const leavingFolder = new WeakSet(); // links opened from folder tabs

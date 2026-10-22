@@ -37,10 +37,10 @@
           tab.removeAttribute("visuallyselected");
         }
       };
-      // LibreWolf switches tabs asynchronously and keeps the old tab marked
+      // Firefox switches tabs asynchronously and keeps the old tab marked
       // as the one on screen ([visuallyselected]) until the new one is drawn.
       // A tab unloaded before that kept the mark for good, and was drawn with
-      // LibreWolf's own selected style (black in dark themes). So the closed
+      // Firefox's own selected style (black in dark themes). So the closed
       // tab is reset once the switch is done. The event can fire during the
       // switch itself, hence listening before switching.
       const whenSwitched = fn => {
@@ -62,17 +62,17 @@
         const removeTab = (tab, options) => original.call(gBrowser, tab, options);
         closeOrReset = (tab, options) => {
           // The empty page (no tab open) has nothing to close: Cmd+W there would
-          // let LibreWolf go to the tab next to it, often an unloaded pinned
+          // let Firefox go to the tab next to it, often an unloaded pinned
           // row, and load it. It stays (the script removes it itself once
           // another tab is selected, while it's no longer the selected one).
           if (tab?.selected && tab.hasAttribute("arc-start-page")) {
             gBrowser.selectedBrowser.focus(); // closes the floating URL bar
             return undefined;
           }
-          // Closing the last normal tab: LibreWolf would go to the tab next to
+          // Closing the last normal tab: Firefox would go to the tab next to
           // it, often an unloaded pinned row, and load it. Go where closing a
           // pinned row goes instead (an open row, else the empty page with the
-          // floating URL bar). With other normal tabs open, LibreWolf decides.
+          // floating URL bar). With other normal tabs open, Firefox decides.
           if (tab?.selected && !isPinnedish(tab) && !tab.hasAttribute("arc-start-page") &&
               !gBrowser.tabs.some(t => t !== tab && !t.closing && !t.hidden && !isPinnedish(t) && !t.hasAttribute("arc-start-page"))) {
             gBrowser.selectedTab = nextAfterClose(tab);
@@ -111,7 +111,7 @@
         return (tab, options) => (peekSection.peekCloses?.(tab) ? undefined : closeOrReset(tab, options));
       };
 
-      // Cmd+W on a tile: LibreWolf never closes a tile from the keyboard (it
+      // Cmd+W on a tile: Firefox never closes a tile from the keyboard (it
       // just jumps to the first unpinned tab); here it closes like a pinned
       // row does (reset, unloaded) and goes where nextAfterClose says
       const closeTilesToo = original => function (event) {

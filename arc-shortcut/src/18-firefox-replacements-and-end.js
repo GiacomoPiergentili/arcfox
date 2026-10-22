@@ -1,6 +1,6 @@
-      // --- LibreWolf's own code, replaced ---
-      // Everything this script replaces in LibreWolf, in one list: what it
-      // is for, LibreWolf's method, and the new version (in its section
+      // --- Firefox's own code, replaced ---
+      // Everything this script replaces in Firefox, in one list: what it
+      // is for, Firefox's method, and the new version (in its section
       // above). If an update renames one, only that feature is off and the
       // browser console says "Arc sidebar (...): not set up". (Option+click's
       // link handling is replaced once for the whole app, at the top.)
@@ -15,7 +15,7 @@
       patchProperty("folders: rows slide", folderClass?.prototype, "collapsed", slideFolderRows);
       patchProperty("+ New Tab while dragging", periphery, "screenY", reportListEnd);
       patch("drag and drop: no page thumbnail", win.DataTransfer?.prototype, "updateDragImage", noThumbnailForTabs);
-      // (LibreWolf makes the preview cards on first hover)
+      // (Firefox makes the preview cards on first hover)
       guard("no tab previews while dragging", () => {
         let patched = false;
         const whenThere = () => {
@@ -76,7 +76,7 @@
     }, "browser-delayed-startup-finished");
   })();
 } catch (e) {
-  // Never let a failure here break the rest of librewolf.cfg
+  // Never let a failure here break the rest of firefox.cfg
   try {
     Components.classes["@mozilla.org/consoleservice;1"].getService(Components.interfaces.nsIConsoleService)
       .logStringMessage(`Arc sidebar: ${e}`);

@@ -1,10 +1,10 @@
       // --- Peek (as in Arc) ---
       // A link to another site clicked in a tile or a pinned row opens in a
       // card floating over the pinned page (dimmed), instead of replacing it.
-      // LibreWolf already opens such links in a new tab from pinned tabs (its
+      // Firefox already opens such links in a new tab from pinned tabs (its
       // "app tab" flag); rows get the flag too. That new tab is the Peek:
       // it's selected (the URL bar shows its address) but hidden from the
-      // sidebar, where the pinned item stays highlighted; LibreWolf's split
+      // sidebar, where the pinned item stays highlighted; Firefox's split
       // view machinery draws both pages. Esc, a click on the dimmed page, the
       // card's close button or switching tabs closes it (and it's gone, in
       // Recently Closed); it can also become a normal tab, or a split view
@@ -51,7 +51,7 @@
         peekSpinner.id = "arc-peek-spinner";
         doc.body.append(peekSpinner);
         let peek = null; // { tab, home, origin }
-        // The page under a Peek stays drawn: LibreWolf drops what a tab it
+        // The page under a Peek stays drawn: Firefox drops what a tab it
         // switches away from has drawn (one black frame), unless told not to
         const keepDrawn = (tab, on) => {
           try {
@@ -96,7 +96,7 @@
           const press = lastPagePress && win.performance.now() - lastPagePress.at < 3000 ? lastPagePress : null;
           const box = cardBox();
           peek.origin = press ? { x: press.x - box.left, y: press.y - box.top } : null;
-          // The pinned page dims right away (and is kept drawn: LibreWolf puts
+          // The pinned page dims right away (and is kept drawn: Firefox puts
           // the page it switched away from to sleep); the card waits, hidden,
           // until its page has drawn (a spinner at the link if that takes a
           // moment), then grows out of the link: never an empty or black card
@@ -170,7 +170,7 @@
           gBrowser.addTabsProgressListener(listener);
           win.setTimeout(reveal, 4000);
         };
-        // LibreWolf takes the two pages down when it finishes switching to the
+        // Firefox takes the two pages down when it finishes switching to the
         // Peek's tab (to it that's a tab outside any split view): put them back
         // before the next frame is drawn
         new win.MutationObserver(() => {
@@ -265,7 +265,7 @@
           const asked = Date.now() - altPeekAt < 1500;
           if (!peek && opener && opener.selected && !opener.splitview && (isPinnedish(opener) || asked)) {
             tab._arcPeekFrom = { opener, at: win.performance.now() };
-            keepDrawn(opener, true); // (before LibreWolf switches away from it)
+            keepDrawn(opener, true); // (before Firefox switches away from it)
             altPeekAt = 0;
           }
         });
@@ -282,7 +282,7 @@
         });
         // Closing the Peek's tab (Cmd+W) closes the Peek (see "closing a
         // pinned row or tile" above); any other way it goes, the Peek is put
-        // away once LibreWolf is done closing it
+        // away once Firefox is done closing it
         const peekCloses = tab => {
           if (peek && tab === peek.tab && !tab.closing) {
             closePeek("close");

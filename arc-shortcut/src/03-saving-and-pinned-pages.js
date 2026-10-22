@@ -71,7 +71,7 @@
         withoutChallenge(a).split("#")[0] === withoutChallenge(b).split("#")[0];
       // A tab's icon, kept with its pinned page so an unloaded row still shows
       // it after a restart. Only inline (data:) icons up to 32 KB: the only
-      // kind LibreWolf lets the script set, and small enough for the pref.
+      // kind Firefox lets the script set, and small enough for the pref.
       const iconOf = tab => {
         const icon = tab.linkedBrowser?.mIconURL || "";
         return icon.startsWith("data:") && icon.length <= 32768 ? icon : null;
@@ -308,7 +308,7 @@
         }, 400);
       };
       const restoreRows = () => {
-        // Tabs that LibreWolf itself restored with the mark (crash recovery,
+        // Tabs that Firefox itself restored with the mark (crash recovery,
         // session restore; folders come back with them) or that use the old
         // pinned-row style
         const marked = [...gBrowser.tabs].filter(tab => {
@@ -326,7 +326,7 @@
             }
             tab.setAttribute(ROW, "");
           }
-          // LibreWolf restores split views too: a row comes back on its own,
+          // Firefox restores split views too: a row comes back on its own,
           // its guest with the normal tabs (see normalize)
           for (const split of [...gBrowser.splitViews]) {
             if (hasRow(split)) {
@@ -376,7 +376,7 @@
         }
         scheduleSave();
       };
-      // Restored once LibreWolf's own session restore (the tiles) is done: it
+      // Restored once Firefox's own session restore (the tiles) is done: it
       // dissolved folders made before it, leaving their tabs as plain rows.
       // Another window builds the list from the shared one instead.
       guard("saving and restoring", () => {
@@ -395,7 +395,7 @@
           });
         }
         // Pinned tabs start on their pinned page (tiles come back from
-        // LibreWolf's session where they were left). Ones pinned before this
+        // Firefox's session where they were left). Ones pinned before this
         // feature take the page they show now.
         SessionStore.promiseAllWindowsRestored?.then(() => {
           for (const tab of gBrowser.tabs) {
@@ -438,7 +438,7 @@
         for (const type of ["TabGroupCreate", "TabGrouped", "TabUngrouped", "TabGroupRemoved", "SplitViewCreated", "SplitViewRemoved"]) {
           gBrowser.tabContainer.addEventListener(type, scheduleNormalize);
         }
-        // A folder made from the menu moves into the block before LibreWolf
+        // A folder made from the menu moves into the block before Firefox
         // opens its "name this folder" panel next to it
         gBrowser.tabContainer.addEventListener("TabGroupCreateByUser", normalize, true);
         for (const type of ["TabGroupUpdate", "TabGroupCollapse", "TabGroupExpand"]) {

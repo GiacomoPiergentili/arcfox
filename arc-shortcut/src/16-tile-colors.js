@@ -101,7 +101,7 @@
           tab.toggleAttribute("arc-tile-colored", !!colors);
         });
       };
-      // A tile never sits without an icon either: LibreWolf clears it when a
+      // A tile never sits without an icon either: Firefox clears it when a
       // new page starts loading (Reddit's bot check page has none, so at
       // launch its tile was blank for seconds); the one saved with its pinned
       // page fills in until the page brings its own

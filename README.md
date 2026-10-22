@@ -2,7 +2,7 @@
 
 An Arc-style sidebar for [Firefox](https://www.mozilla.org/firefox/) on macOS, designed to feel as if Apple had made it.
 
-> **Moving from LibreWolf to Firefox.** arcfox continues [librewolf-arc](https://github.com/GiacomoPiergentili/librewolf-arc) (its full history is here) on Mozilla's own Firefox, made lean and private with [Betterfox](https://github.com/yokoffing/Betterfox): the same engine, but Apple's passwords and passkeys work there (macOS only lets them reach apps Apple has approved, and LibreWolf isn't one). The rest of this README still describes the LibreWolf version, until the move is done.
+> arcfox continues [librewolf-arc](https://github.com/GiacomoPiergentili/librewolf-arc) (its full history is here) on Mozilla's own Firefox, made lean and private with [Betterfox](https://github.com/yokoffing/Betterfox): the same engine, but Apple's passwords and passkeys work there (macOS only lets them reach apps Apple has approved, and LibreWolf isn't one).
 
 Firefox's native vertical tabs become an Arc sidebar: the toolbar and URL bar live at the top of the sidebar, favorite **tiles** and **pinned rows** (with **folders**) sit above a divider, and normal tabs below it. Cmd+T opens a Spotlight-style command bar instead of a blank tab. Everything follows one spacing rhythm, one set of corner radii, fills and shadows, and the system accent color.
 
@@ -15,9 +15,9 @@ Firefox's native vertical tabs become an Arc sidebar: the toolbar and URL bar li
 It's two pieces:
 
 - **`userChrome.css`**: the whole look (layout, sizes, colors, motion).
-- **`arc-shortcut/src/`**: the behavior (pinned rows and folders, the command bar, closing rules, tile colors, ...), one file per feature. It runs as a LibreWolf *autoconfig* script: `arc-shortcut/install.sh` joins the files in order into the app's `librewolf.cfg`.
+- **`arc-shortcut/src/`**: the behavior (pinned rows and folders, the command bar, closing rules, tile colors, ...), one file per feature. It runs as a Firefox *autoconfig* script: `arc-shortcut/install.sh` joins the files in order into the app's `firefox.cfg`.
 
-Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark and light mode.
+Built on Firefox 158 and tested on **Firefox 158** with Betterfox (macOS) with the Nova Ash theme, in dark and light mode.
 
 ## Features
 
@@ -30,15 +30,15 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Start-up: everything appears at once, in one short fade: the toolbar buttons, tiles, rows, folders, their icons, the bottom row with the profiles, and the command bar in the middle (it waits for the icons and profiles, half a second at most). The page area has the empty page's color from the first frame.
 
 ### Profiles (Arc's Spaces)
-- LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
+- Firefox profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
 - **Profile switcher** in the middle of the sidebar's bottom row: the profiles' avatars in their colors (the current one in its colors, the others greyed out; hover for the name, with the same rounded-square fill as the other icon buttons), as many as fit. Click one to bring its window forward (or start it). Shown once there are two profiles.
-- New profiles are made from LibreWolf's Profiles menu. On a profile's first run, if it doesn't have the look yet, its `chrome` folder is linked to this repo (`install.sh` records where it is) and the settings that load it are turned on; a bar offers to restart, since the look loads at startup.
+- New profiles are made from Firefox's Profiles menu. On a profile's first run, if it doesn't have the look yet, its `chrome` folder is linked to this repo (`install.sh` records where it is) and the settings that load it are turned on; a bar offers to restart, since the look loads at startup.
 - Any profile's first run with the script gives it, once, the settings the layout relies on (no bookmarks toolbar, a blank start page, no new tab page content); what you change afterwards stays.
 
 ### Tiles, pinned rows and folders (Arc's favorites and pinned tabs)
-- **Tiles** (Cmd+Shift+D): LibreWolf's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
+- **Tiles** (Cmd+Shift+D): Firefox's pinned tabs, shown as a grid of icon tiles, in both sidebar modes. Like the pinned rows, they come back unloaded at launch and load when opened (`browser.sessionstore.restore_pinned_tabs_on_demand`).
 - **Pinned rows** (Cmd+D): normal tabs kept above the divider; saved and reopened (unloaded) at every launch.
-- **Folders**: LibreWolf's tab groups, kept in the pinned block, styled like Arc's. A collapsed folder keeps showing its loaded tabs (only unloaded ones hide; no "+N"). Opening or closing one slides its rows open or shut, and the folder icon's front tilts open or shuts with it.
+- **Folders**: Firefox's tab groups, kept in the pinned block, styled like Arc's. A collapsed folder keeps showing its loaded tabs (only unloaded ones hide; no "+N"). Opening or closing one slides its rows open or shut, and the folder icon's front tilts open or shuts with it.
 - **Motion**: a tab's row slides open when it opens and shut when it closes (the rows below follow); Cmd+D, Cmd+Shift+D and Pin / Unpin glide everything to its new place, a tab turning into a tile (or back) growing into it; closing a pinned row or tile settles it back in place, so it reads as put back; a selected tile's colors fade in and out; the away dot pops in; two tabs joining or leaving a split view grow into place; other windows glide when they follow a change. The Cmd+T bar pops in and fades out where it is. Off with the system's Reduce Motion.
 - Arc-style drag and drop between tiles, rows, folders and normal tabs, with live cues: a tab dropped on the tiles becomes a tile right where it's dropped (the tiles slide aside to make room, the grid grows a line if needed); a folder folds up while it's dragged without the list below jumping; whatever moves when a drop lands glides there. No tab preview cards during drags. A tab dropped on the page goes back where it was (or splits, see below) instead of tearing off into a new window; only a drop outside the window does that, as in Arc and Safari. Drags may wander anywhere (over the page, in and out of the sidebar) and come back.
 - **Every window shows the same tiles, rows and folders**, kept in sync: pin, reorder, rename or remove in one window and the others follow (each window has its own copy of the pages, unloaded until opened). Private windows keep to themselves.
@@ -52,12 +52,12 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - No stray blank tabs: double-clicking empty sidebar space does nothing; Cmd+W on the empty page does nothing.
 
 ### Split view (as in Arc)
-- Drag a tab from the sidebar (or from another window) onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (LibreWolf's own split view underneath). LibreWolf's right-click "Add Split View" / "Open in Split View" work too.
+- Drag a tab from the sidebar (or from another window) onto the page: the left or right half lights up, and dropping there opens the tab side by side with the page you were on (Firefox's own split view underneath). Firefox's right-click "Add Split View" / "Open in Split View" work too.
 - The two pages are two cards 8px apart; the active one has a thin accent ring, the other shows its address in its corner. In the sidebar the pair is one row, like a macOS segmented control: same height and edges as the rows, a soft fill while it's on screen, a stronger inset fill on the page with the focus.
 - **Pinned rows can be split**: the pair sits in the row's spot (inside its folder, too). Only the row is saved; the normal tab next to it is a guest that goes back down to the normal tabs when the two are separated. Two rows split together each keep their own place.
 - Cmd+W on a row in a split: the row leaves the pair and resets as usual; the other page stays open. Closing either half shows the other one.
-- A split of normal tabs comes back after a restart (when LibreWolf restores your tabs); a row comes back on its own.
-- Tiles stay out: LibreWolf can't put its pinned tabs in a split view.
+- A split of normal tabs comes back after a restart (when Firefox restores your tabs); a row comes back on its own.
+- Tiles stay out: Firefox can't put its pinned tabs in a split view.
 
 ### Peek (as in Arc)
 - A link to another site clicked in a tile or a pinned row opens in a card floating over the pinned page (dimmed), instead of replacing it. Links within the same site navigate as usual.
@@ -71,7 +71,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - After closing a row, a tile or the last normal tab you go to the most recently used open row, else the empty page with the bar, never to an unloaded row that would start loading.
 
 ### Auto-archive (as in Arc)
-- Normal tabs left unused for 24 hours close by themselves, quietly. They're in LibreWolf's recently closed tabs (Cmd+Shift+T, or History → Recently Closed Tabs), form contents included.
+- Normal tabs left unused for 24 hours close by themselves, quietly. They're in Firefox's recently closed tabs (Cmd+Shift+T, or History → Recently Closed Tabs), form contents included.
 - Never touched: tiles, pinned rows and folders, the current tab, and tabs playing sound, in picture-in-picture, sharing the camera/mic/screen or still loading.
 - Change the time in `about:config` → `arc.archiveAfterHours` (hours; `0` turns it off).
 
@@ -99,35 +99,36 @@ The commands above are also in the menu bar, with their shortcuts: Window → Pi
 
 ## Install
 
-1. In `about:config`, set:
-   - `toolkit.legacyUserProfileCustomizations.stylesheets` = `true` (loads `userChrome.css`)
-   - `sidebar.revamp` = `true` and `sidebar.verticalTabs` = `true` (native vertical tabs)
-2. Put this repo's contents in your profile's `chrome` folder (`about:support` → Profile Folder → Open; create `chrome` if it's missing). Cloning straight into it works:
+1. Use a Firefox profile of its own for this (`about:profiles` → Create a New Profile), ideally with [Betterfox](https://github.com/yokoffing/Betterfox)'s `user.js` in its profile folder. Betterfox already turns on `toolkit.legacyUserProfileCustomizations.stylesheets` (which loads `userChrome.css`); without it, set that in `about:config`, plus `sidebar.revamp` = `true` and `sidebar.verticalTabs` = `true` (native vertical tabs).
+2. Clone this repo anywhere and link it as the profile's `chrome` folder (`about:support` → Profile Folder → Open):
    ```bash
-   git clone https://github.com/GiacomoPiergentili/librewolf-arc.git "<profile folder>/chrome"
+   git clone https://github.com/GiacomoPiergentili/arcfox.git ~/Developer/arcfox
+   ln -s ~/Developer/arcfox "<profile folder>/chrome"
    ```
-3. Install the script into LibreWolf.app. macOS requires the **App Management** permission for this: give it to Terminal in System Settings → Privacy & Security → App Management, then in Terminal:
+   (Or skip the link: once the script is installed, a profile without the look gets its `chrome` folder linked to the repo on its first run, and a bar offers to restart.)
+3. Install the script into Firefox.app. macOS requires the **App Management** permission for this: give it to Terminal in System Settings → Privacy & Security → App Management, then in Terminal:
    ```bash
-   "<profile folder>/chrome/arc-shortcut/install.sh"
+   ~/Developer/arcfox/arc-shortcut/install.sh
    ```
-4. Quit LibreWolf (Cmd+Q) and reopen it.
+   Firefox runs no autoconfig script by default: the installer adds `defaults/pref/arc-shortcut-prefs.js` (which names `firefox.cfg` and turns off its sandbox) and `firefox.cfg` (the script, between `>>> ARC SIDEBAR SHORTCUT >>>` markers) to `Firefox.app/Contents/Resources`. Rerunning it replaces the block.
+4. Quit Firefox (Cmd+Q) and reopen it.
 
-**After every LibreWolf update, run `install.sh` again**: updates replace the app, including the config file the script lives in (the CSS keeps working without it, the behavior doesn't). When the script isn't running, a notice at the bottom of the sidebar says so.
+**After every Firefox update, run `install.sh` again**: updates replace the app, including the files the script lives in (the CSS keeps working without it, the behavior doesn't). When the script isn't running, a notice at the bottom of the sidebar says so.
 
-To remove the script: `install.sh uninstall`, then restart. To remove the look: delete or rename `userChrome.css`.
+To remove the script: `install.sh uninstall`, then restart. To remove the look: delete or rename `userChrome.css` (or the `chrome` link).
 
 ## How it works
 
 | File | What it is |
 |---|---|
 | `userChrome.css` | All styling. Design tokens at the top; sections for the sidebar, tabs, tiles, rows/folders, URL bar, menus and panels, auto-hide, motion, fullscreen. |
-| `arc-shortcut/src/*.js` | The script, one file per feature (`01-start.js` opens the per-window set-up, `18-…` lists every replacement of LibreWolf's code and closes it). The installer joins them in order and appends them to `LibreWolf.app/Contents/Resources/librewolf.cfg`. Runs once per browser window; each feature sets itself up on its own, so one broken by a LibreWolf update leaves the rest working (the browser console names it: "Arc sidebar (…): not set up"). |
-| `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `librewolf.cfg` and the pref file below. |
-| `arc-shortcut/arc-shortcut-prefs.js` | Disables the autoconfig sandbox so the script can reach browser windows. |
+| `arc-shortcut/src/*.js` | The script, one file per feature (`01-start.js` opens the per-window set-up, `18-…` lists every replacement of Firefox's code and closes it). The installer joins them in order and appends them to `Firefox.app/Contents/Resources/firefox.cfg`. Runs once per browser window; each feature sets itself up on its own, so one broken by a Firefox update leaves the rest working (the browser console names it: "Arc sidebar (…): not set up"). |
+| `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `firefox.cfg` and the pref file below. |
+| `arc-shortcut/arc-shortcut-prefs.js` | Has Firefox run `firefox.cfg` at startup, outside the autoconfig sandbox (so the script can reach browser windows). |
 
 The script keeps its state in prefs and session data: tiles in the pref `arc.tiles` and pinned rows and folders in `arc.pinnedRows` (the shared list every window follows; each item has an id, `arc-id` on its tabs), the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
 
-Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
+Some of Firefox's UI lives in shadow DOM that `userChrome.css` can't reach (`::part()` is ignored in this build); where needed, the script injects small style blocks there (the sidebar's bottom buttons, the tile grid).
 
 ## Tests
 
@@ -135,7 +136,7 @@ Some of LibreWolf's UI lives in shadow DOM that `userChrome.css` can't reach (`:
 python3 tests/run_tests.py
 ```
 
-Launches LibreWolf with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, folders opening and closing, tabs sliding and gliding, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about a minute; prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every LibreWolf update.
+Launches Firefox with a fresh, throwaway test profile that uses this repo's `userChrome.css` (your own profile is never touched), drives it through Marionette and checks: layout and spacing, tile colors, the Cmd+T bar, shortcuts, closing rules, tiles in auto-hide mode, the sidebar color measurement, split view by drag and drop, folders opening and closing, tabs sliding and gliding, rows and folders across a restart, auto-archive, and the same sidebar in several windows. Takes about two minutes; `--user-js <file>` runs it on top of a `user.js` (e.g. Betterfox's); prints PASS/FAIL per check and exits with 1 on any failure. Needs the script installed (`install.sh`); Python 3 standard library only. Run it after changes and after every Firefox update.
 
 ## What's been done
 
@@ -178,3 +179,4 @@ Plans and known gaps: see [TODO.md](TODO.md).
 ## License
 
 [MIT](LICENSE): free to use, change and share, with the copyright notice kept.
+29. **From LibreWolf to Firefox**: the repo moved to arcfox, on Firefox 158 with Betterfox (Apple's iCloud Passwords and passkeys can't reach LibreWolf). A Firefox installer (it adds the autoconfig pref file and `firefox.cfg`), Downloads kept visible (Firefox hides it until there's a download), and a new profile gets back, forward, reload and Downloads on its toolbar (Firefox 158 leaves reload and Downloads out with vertical tabs). The test suite runs on Firefox, on its own or on top of Betterfox.

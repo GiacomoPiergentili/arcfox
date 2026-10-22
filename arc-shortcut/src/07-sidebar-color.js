@@ -1,6 +1,6 @@
       // --- the auto-hide sidebar's color ---
       // The pinned sidebar shows macOS's window background (from the theme,
-      // tinted by the wallpaper), which CSS can't read; LibreWolf paints the
+      // tinted by the wallpaper), which CSS can't read; Firefox paints the
       // auto-hide one near-black. So the pinned sidebar is measured (one
       // pixel of empty tab-list space in its middle column, where the eye is:
       // some themes shade it from edge to edge; from a snapshot), per

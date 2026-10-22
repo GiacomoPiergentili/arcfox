@@ -1,6 +1,6 @@
 # To do
 
-What's next for librewolf-arc, most valuable first. Move items to the README's "What's been done" when they ship.
+What's next for arcfox, most valuable first. Move items to the README's "What's been done" when they ship.
 
 ## Next
 
@@ -14,27 +14,28 @@ Nothing queued.
 
 
 ## Known limitations
-- Apple guidelines, not done: the pinned page dot can't take keyboard focus (its action is in the tab's context menu); the sidebar can't be translucent (LibreWolf allows no blur behind its own interface); our few labels are English only.
+- Apple guidelines, not done: the pinned page dot can't take keyboard focus (its action is in the tab's context menu); the sidebar can't be translucent (Firefox allows no blur behind its own interface); our few labels are English only.
 
 - The auto-hide sidebar is one flat color; themes that shade the pinned sidebar from edge to edge (Nova Ash does, slightly) match it in the middle, within a shade. With the sidebar kept on auto-hide, a wallpaper change is picked up the next time it's pinned (Cmd+S).
 - Multiple windows: if two windows change the sidebar within the same half second, the later save wins. Whether a folder is open or closed stays per window. A change of a tile's icon alone reaches other windows with the next other change.
-- The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's LibreWolf's own layout.
+- The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's Firefox's own layout.
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
 - The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
-- Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when LibreWolf quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (LibreWolf can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
-- Profile switcher: switching and creating profiles were tested with made-up profiles only (LibreWolf turns its profiles on only for profiles in its profile list, which the test profiles aren't); the layout and fitting were measured.
-- Tiles can't be split (LibreWolf keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
+- Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when Firefox quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (Firefox can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
+- Profile switcher: switching and creating profiles were tested with made-up profiles only (Firefox turns its profiles on only for profiles in its profile list, which the test profiles aren't); the layout and fitting were measured.
+- Tiles can't be split (Firefox keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
 - Dragging a tab in from another window is tested with simulated events only. Real drags were checked by hand-run recordings (`~/.arc-drag`, outside the repo), not in the test suite.
-- When a tab leaves the tiles mid-drag, LibreWolf sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
-- A folder folds up while it's dragged (LibreWolf's design); the rows above close up and its space waits above the divider until the drop.
-- LibreWolf's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
-- `restoreRows` still converts rows saved by an early version (when rows were LibreWolf pinned tabs); it doubles as crash recovery, so it stays.
+- When a tab leaves the tiles mid-drag, Firefox sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
+- A folder folds up while it's dragged (Firefox's design); the rows above close up and its space waits above the divider until the drop.
+- Firefox's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
+- `restoreRows` still converts rows saved by an early version (when rows were Firefox pinned tabs); it doubles as crash recovery, so it stays.
 
 ## Animation ideas
-- Left alone on purpose: switching tabs and hover stay instant / near-instant; page loading and the Downloads progress are LibreWolf's own.
+- Left alone on purpose: switching tabs and hover stay instant / near-instant; page loading and the Downloads progress are Firefox's own.
 
 ## Done
 
+- [x] Moved from LibreWolf to Firefox 158 + Betterfox: Firefox installer, Downloads kept visible, toolbar buttons placed on a new profile's first run, tests on Firefox (also on top of Betterfox's `user.js`).
 - [x] New profiles: the settings the layout relies on are applied once on a profile's first run (a new profile showed the bookmarks toolbar in the sidebar, no launch command bar, no Bookmarks button).
 - [x] Spaces, as LibreWolf profiles: a profile switcher in the sidebar's bottom row; profiles made from LibreWolf's menu get the look on their first run.
 - [x] Profile switcher after a restart showed nothing to switch to: it asked for the profiles before LibreWolf's profile service had started. No more + (profiles come from LibreWolf's menu), no Bookmarks / History buttons, Downloads at the left, a visible hover on the avatars.

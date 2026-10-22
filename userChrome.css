@@ -1,9 +1,9 @@
 /* =====================================================================
-   Arc-style LibreWolf, styled after macOS (one spacing rhythm, one set of
+   Arc-style Firefox, styled after macOS (one spacing rhythm, one set of
    radii, fills and shadows, defined below)
    Requires: native vertical tabs (sidebar.verticalTabs = true) and, for the
    behavior (rows, tiles, Cmd+T bar, ...), arc-shortcut/install.sh
-   Restart LibreWolf (Cmd+Q) after editing.
+   Restart Firefox (Cmd+Q) after editing.
    ===================================================================== */
 
 /* ---------- Tweak me ---------- */
@@ -49,7 +49,7 @@
   --arc-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px var(--arc-hairline);
   --arc-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--arc-hairline);
 
-  /* LibreWolf's purple accent -> the system accent (checkboxes, toggles,
+  /* Firefox's own accent -> the system accent (checkboxes, toggles,
      primary buttons) and the softer accent for focus rings */
   --color-accent-primary: var(--arc-focus) !important;
   --focus-outline-color: var(--arc-focus-ring) !important;
@@ -90,7 +90,7 @@
 }
 
 /* ---------- Sidebar ---------- */
-/* The padding goes on the inner element, not #sidebar-container: LibreWolf's
+/* The padding goes on the inner element, not #sidebar-container: Firefox's
    hover check uses the inner element's box, and padding outside it left a
    4px dead zone at the screen edge (in fullscreen the sidebar closed itself
    whenever the pointer rested against the edge). */
@@ -111,7 +111,7 @@
 sidebar-main {
   --focus-outline-color: transparent !important;
   /* The sidebar's contents fill it. Until its edge is dragged once,
-     LibreWolf sized them from a width of its own (narrower than the sidebar:
+     Firefox sized them from a width of its own (narrower than the sidebar:
      a fresh profile fit only 2 tiles per row, with empty space at the right) */
   --sidebar-expanded-launcher-width: 100% !important;
 }
@@ -137,13 +137,13 @@ sidebar-main {
 
 /* ---------- Tabs as pills ---------- */
 /* A tight list like Finder/Safari sidebars: rows separated only by
-   --arc-tab-gap (LibreWolf adds a grid gap plus padding on each row) */
+   --arc-tab-gap (Firefox adds a grid gap plus padding on each row) */
 #tabbrowser-tabs[orient="vertical"] {
   grid-gap: 0 !important;
   --tab-padding-block-start: calc(var(--arc-tab-gap) / 2) !important;
   --tab-padding-block-end: calc(var(--arc-tab-gap) / 2) !important;
   --tab-margin-block: 0px !important;
-  /* LibreWolf derives this from the row height (to center icons in the
+  /* Firefox derives this from the row height (to center icons in the
      collapsed sidebar); fixed, so icons stay in one column (12px from the
      row's edge) with the folder icons, the tiles and the bottom buttons */
   --tab-padding-inline: 16px !important;
@@ -159,7 +159,7 @@ sidebar-main {
 }
 
 /* All titles at full strength, as in Safari's sidebar: only the fill marks
-   the selected tab (LibreWolf dims unselected titles to 70%) */
+   the selected tab (Firefox dims unselected titles to 70%) */
 #tabbrowser-tabs[orient="vertical"] .tab-label-container {
   opacity: 1 !important;
 }
@@ -180,7 +180,7 @@ sidebar-main {
   --tab-pinned-min-width-expanded: calc(var(--arc-pinned-min-width) + var(--arc-tile-gap)) !important;
 }
 
-/* With the sidebar on auto-hide, LibreWolf lists pinned tabs as labeled rows
+/* With the sidebar on auto-hide, Firefox lists pinned tabs as labeled rows
    instead of tiles; keep them tiles, sized as in the pinned sidebar (the
    grid itself is set inside the pinned area by the shortcut script) */
 :root[sidebar-expand-on-hover] #tabbrowser-tabs[orient="vertical"][expanded] #pinned-tabs-container {
@@ -199,14 +199,14 @@ sidebar-main {
     margin-inline: var(--tab-margin-inline-pinned-expanded) !important;
   }
 
-  /* LibreWolf leaves room after every icon for its title in this mode, which
+  /* Firefox leaves room after every icon for its title in this mode, which
      put tile icons off center */
   :is(.tab-throbber, .tab-icon-pending, .tab-icon-image) {
     margin-inline-end: 0 !important;
   }
 }
 
-/* Tiles never show a close button (in auto-hide mode LibreWolf showed one on
+/* Tiles never show a close button (in auto-hide mode Firefox showed one on
    hover, pushing the icon aside): Cmd+W or the right-click menu reset them */
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-close-button {
   display: none !important;
@@ -224,7 +224,7 @@ sidebar-main {
   margin-bottom: calc(7px - var(--arc-tile-gap) / 2 - var(--arc-tab-gap) / 2) !important;
 }
 
-/* Same gap between tile rows as between tiles side by side (LibreWolf
+/* Same gap between tile rows as between tiles side by side (Firefox
    leaves 2px). The grid's row height comes from this variable, and each tile
    keeps half the gap above and below inside its row. */
 #pinned-tabs-container[orient="vertical"] {
@@ -239,14 +239,14 @@ sidebar-main {
   background-color: var(--arc-fill-tile) !important;
 }
 
-/* Tiles keep their full-color icon when unloaded (LibreWolf grays out and
+/* Tiles keep their full-color icon when unloaded (Firefox grays out and
    fades unloaded tabs' icons) */
 #pinned-tabs-container .tabbrowser-tab[pinned] .tab-icon-image[pending] {
   filter: none !important;
   opacity: 1 !important;
 }
 
-/* Unloaded pinned rows show their icon grayed out, as LibreWolf does for
+/* Unloaded pinned rows show their icon grayed out, as Firefox does for
    tabs you unload; it doesn't for ones reopened unloaded at startup */
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[arc-pinned-row] .tab-icon-image[pending] {
   filter: grayscale(100%);
@@ -264,7 +264,7 @@ sidebar-main {
   margin-bottom: 5px !important;
 }
 
-/* On drop LibreWolf first slides the tab to where it computes the slot (as if
+/* On drop Firefox first slides the tab to where it computes the slot (as if
    every slot were one tab tall, which the tile rows, the divider gap and
    + New Tab are not) and only then moves it, which showed as a jump. Make
    that slide near-instant so the tab just lands in place (and invisible
@@ -279,7 +279,7 @@ sidebar-main {
 
 /* ---------- Pinned rows and folders (Arc's "pinned tabs") ----------
    Normal tabs marked [arc-pinned-row] by the shortcut script (Cmd+D) and
-   folders (LibreWolf's tab groups) form one block at the top of the tab
+   folders (Firefox's tab groups) form one block at the top of the tab
    list. Below it: the divider, + New Tab, then the other tabs (Arc's order).
    A split view with a row in it sits in the block too, in the row's spot. */
 #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab[arc-pinned-row], tab-group, tab-group > *, tab-split-view-wrapper:has(> .tabbrowser-tab[arc-pinned-row])) {
@@ -287,7 +287,7 @@ sidebar-main {
 }
 
 /* Folders look like Arc's: a row like the tabs, with a folder icon in the
-   folder's color, instead of LibreWolf's colored pill */
+   folder's color, instead of Firefox's colored pill */
 #tabbrowser-tabs[orient="vertical"][expanded] tab-group > .tab-group-label-container {
   margin: calc(var(--arc-tab-gap) / 2) var(--tab-margin-inline-inner) !important;
   padding: 0 !important;
@@ -359,7 +359,7 @@ sidebar-main {
   background-color: color-mix(in srgb, var(--tab-group-color) 82%, white);
 }
 
-/* A collapsed folder keeps showing its loaded tabs (LibreWolf showed only
+/* A collapsed folder keeps showing its loaded tabs (Firefox showed only
    the selected one, and a "+N" for the others): only unloaded ones hide.
    The script slides rows open and shut, here and when tabs open and close
    ([arc-folding] keeps a closing row on screen until it has slid shut). */
@@ -405,9 +405,9 @@ sidebar-main {
   }
 }
 
-/* LibreWolf's end-of-list box, which holds + New Tab, sits right under the
+/* Firefox's end-of-list box, which holds + New Tab, sits right under the
    pinned block, the divider in the 16px gap above it, so the line always
-   moves with the button. While dragging, LibreWolf would shift the box as if
+   moves with the button. While dragging, Firefox would shift the box as if
    it came after every tab; the script shifts it instead
    (--arc-newtab-shift), with the rows. */
 #tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery {
@@ -435,7 +435,7 @@ sidebar-main {
   transition: translate calc(var(--arc-drag-duration) * 4 / 3) ease !important;
 }
 
-/* Keep it there with long tab lists too, instead of LibreWolf's second
+/* Keep it there with long tab lists too, instead of Firefox's second
    button at the bottom */
 #tabbrowser-arrowscrollbox[orient="vertical"][overflowing] > #tabbrowser-arrowscrollbox-periphery > #tabs-newtab-button {
   display: flex !important;
@@ -479,7 +479,7 @@ sidebar-main {
 }
 
 /* A folder being dragged: the script holds its space above + New Tab, so
-   the normal tabs below it stay put without LibreWolf's own offset (which
+   the normal tabs below it stay put without Firefox's own offset (which
    would push them down a second time) */
 :root[arc-folder-drag] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned], [arc-pinned-row]), tab-split-view-wrapper:not(:has(> .tabbrowser-tab[arc-pinned-row]))) {
   top: 0 !important;
@@ -559,7 +559,7 @@ sidebar-main {
 }
 
 /* Selected: a soft neutral fill (like Finder/Safari sidebars) instead of
-   LibreWolf's purple-to-orange gradient outline */
+   Firefox's purple-to-orange gradient outline */
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:is([selected], [multiselected]) .tab-background {
   background: var(--arc-fill-selected) !important;
   border-color: transparent !important;
@@ -660,7 +660,7 @@ sidebar-main {
   }
 }
 
-/* A loading tile keeps its icon (LibreWolf swaps it for a spinner, so at
+/* A loading tile keeps its icon (Firefox swaps it for a spinner, so at
    launch, when every tile reloads, they all sat blank for seconds); one with
    no icon yet still shows the spinner */
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-icon-image[busy][src] {
@@ -673,7 +673,7 @@ sidebar-main {
 
 /* Sound badges on a tile (playing, muted, autoplay blocked): a plain icon in
    the top left corner, mirroring the pinned page dot on the right, instead of
-   LibreWolf's black circle over the site icon. Still clickable. */
+   Firefox's black circle over the site icon. Still clickable. */
 #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned] .tab-icon-stack {
   position: static !important; /* so the badge is placed on the tile */
 }
@@ -701,7 +701,7 @@ sidebar-main {
   }
 }
 
-/* Whole pixels: LibreWolf puts 7.5px between a tab's icon and its title and
+/* Whole pixels: Firefox puts 7.5px between a tab's icon and its title and
    indents folder contents by 8.25px (0.75rem), leaving titles and icons on
    half pixels and out of line with the folder's own title (44px) */
 #tabbrowser-tabs[orient="vertical"][expanded] {
@@ -720,7 +720,7 @@ sidebar-main {
 #tabs-newtab-button {
   border-radius: var(--arc-radius-inner) !important;
   /* a row like the tabs: their text color, not the toolbar buttons' (some
-     themes tint those, e.g. LibreWolf's default one in purple) */
+     themes tint those, e.g. in purple) */
   color: var(--tab-text-color) !important;
 
   > .toolbarbutton-icon {
@@ -770,7 +770,7 @@ sidebar-main {
 }
 
 /* Inside the panel documents (their parts are only reachable through
-   LibreWolf's design tokens) */
+   Firefox's design tokens) */
 @-moz-document url-prefix("chrome://browser/content/sidebar/") {
   :root {
     --border-radius-circle: var(--arc-radius-inner) !important;  /* rows: no pills */
@@ -815,7 +815,7 @@ sidebar-main {
 /* Lift the toolbar out of the layout and pin it over the sidebar */
 #navigator-toolbox {
   box-sizing: border-box !important;
-  /* LibreWolf clips the toolbox; the URL bar grows past it while editing */
+  /* Firefox clips the toolbox; the URL bar grows past it while editing */
   overflow: visible !important;
   position: fixed !important;
   position-anchor: --arc-sidebar;
@@ -832,12 +832,12 @@ sidebar-main {
 /* Push the tab list below the toolbar */
 #vertical-tabs {
   /* + the macOS menu bar's height while it's shown in fullscreen, which
-     LibreWolf adds here itself (this rule overrode it) */
+     Firefox adds here itself (this rule overrode it) */
   /* (16px from the URL bar to the tiles, counting each tile's half gap) */
   padding-top: calc(var(--arc-row-height) + var(--arc-urlbar-gap) + var(--arc-urlbar-height) + 11px - var(--arc-tile-gap) / 2 + var(--fullscreen-menubar-shift, 0px)) !important;
 }
 
-/* LibreWolf positions a dragged tab absolutely, offset from the tab strip;
+/* Firefox positions a dragged tab absolutely, offset from the tab strip;
    make the strip its containing block (not #browser) so it stays under the
    pointer */
 #tabbrowser-tabs[orient="vertical"] {
@@ -867,7 +867,7 @@ sidebar-main {
 }
 
 /* Downloads and Extensions: at the two ends of the sidebar's bottom row
-   (LibreWolf's tool buttons there are hidden), sized like every icon button
+   (Firefox's tool buttons there are hidden), sized like every icon button
    (30px); Extensions' icon is in line with the tabs' close buttons. They
    stay in the toolbar, so they hide and slide together with it; the toolbar
    starts at the window's top, so 100vh is the sidebar's bottom edge. */
@@ -881,7 +881,7 @@ sidebar-main {
 }
 
 /* Downloads at the left end (its icon in line with the tab icons),
-   Extensions at the right, the profile switcher between them. LibreWolf
+   Extensions at the right, the profile switcher between them. Firefox
    builds Downloads hidden and shows it only after the window is up (it
    never auto-hides it), so it popped in late at launch: always shown. */
 #downloads-button {
@@ -910,7 +910,7 @@ sidebar-main {
    the shortcut script): 30px squares 34px apart, with the tab rows' corners
    and hover / pressed fills */
 #navigator-toolbox {
-  /* (LibreWolf 158's names; it tints them with the accent otherwise) */
+  /* (Firefox 158's names; it tints them with the accent otherwise) */
   --toolbarbutton-background-color-hover: var(--arc-fill-hover) !important;
   --toolbarbutton-background-color-active: var(--arc-fill-selected) !important;
 }
@@ -982,7 +982,7 @@ sidebar-main {
   --urlbar-input-container-outline-open: none;
   --urlbar-input-container-outline-open-focused: none;
   --urlbar-background-box-shadow-open: var(--arc-shadow-3);
-  /* Clip the bar's contents with the same corners (LibreWolf uses 24px) */
+  /* Clip the bar's contents with the same corners (Firefox uses 24px) */
   --urlbar-border-radius: var(--arc-radius);
 }
 
@@ -1036,7 +1036,7 @@ panel {
   --button-text-color-menu-active: AccentColorText !important;
 }
 
-/* Menu rows at macOS menu height (LibreWolf: 32px) */
+/* Menu rows at macOS menu height (Firefox: 32px) */
 panel :is(.subviewbutton, panelview .toolbarbutton-1) {
   min-height: 26px !important;
 }
@@ -1063,7 +1063,7 @@ panel toolbarseparator {
 }
 
 /* ---------- Auto-hide sidebar (expand on hover) ---------- */
-/* States set by LibreWolf on #sidebar-container:
+/* States set by Firefox on #sidebar-container:
    collapsed = no [sidebar-launcher-expanded], no [sidebar-ongoing-animations]
    expanding = [sidebar-launcher-expanded][sidebar-ongoing-animations]
    collapsing = [sidebar-ongoing-animations] only */
@@ -1083,7 +1083,7 @@ panel toolbarseparator {
   --arc-spotlight-font-size: 20px;
   --arc-spotlight-list-font-size: 14px;
   --arc-spotlight-icon-size: 20px;     /* engine icon and go arrow, matching the text */
-  --arc-spotlight-chevron-size: 14px;  /* engine pill chevron (LibreWolf: 12px) */
+  --arc-spotlight-chevron-size: 14px;  /* engine pill chevron (Firefox: 12px) */
 }
 
 /* No resizing in auto-hide mode (resize it with auto-hide off) */
@@ -1098,7 +1098,7 @@ panel toolbarseparator {
   max-width: var(--arc-hover-strip) !important;
   padding: 0 !important;
   overflow: visible !important;
-  /* LibreWolf paints the auto-hide launcher dark; let the window color show */
+  /* Firefox paints the auto-hide launcher dark; let the window color show */
   background: transparent !important;
   border: none !important;
 }
@@ -1114,13 +1114,13 @@ panel toolbarseparator {
   visibility: hidden !important;
 }
 
-/* Collapsing: LibreWolf switches tabs to the square icon layout at the start
+/* Collapsing: Firefox switches tabs to the square icon layout at the start
    of the slide-out, so hide the contents and let the empty panel slide away */
 :root[sidebar-expand-on-hover] #sidebar-container[sidebar-ongoing-animations]:not([sidebar-launcher-expanded]) > sidebar-main {
   visibility: hidden !important;
 }
 
-/* LibreWolf counter-slides the sidebar contents during the animation so its
+/* Firefox counter-slides the sidebar contents during the animation so its
    collapsed icons stay put. With a fully hidden sidebar that shows an empty
    panel sliding in first, so make the contents ride along with the panel
    (!important beats the script animation) */
@@ -1159,7 +1159,7 @@ panel toolbarseparator {
 /* ...and while it's in use (focused, hovered, or its engine menu is open),
    show it as a floating Spotlight-style command bar. During a marked
    floating edit ([arc-floating-urlbar], set by the shortcut script) the mark
-   alone keeps it floating, so LibreWolf briefly dropping [focused] while the
+   alone keeps it floating, so Firefox briefly dropping [focused] while the
    sidebar moves can't make it blink. The new tab bar (Cmd+T / + New Tab,
    [arc-newtab-bar] from the script) floats even with the sidebar shown,
    and stays there while it fades out after closing ([arc-newtab-fading]). */
@@ -1227,7 +1227,7 @@ panel toolbarseparator {
 }
 
 /* ---------- Motion (Apple-style) ----------
-   LibreWolf slides the panel from a script (`translate`, symmetric
+   Firefox slides the panel from a script (`translate`, symmetric
    ease-in-out, 400ms). Cancel that and run our own animation on `transform`
    instead, so panel and toolbar share one curve: opening starts fast and
    settles softly, closing is quicker and accelerates away. */
@@ -1353,7 +1353,7 @@ panel toolbarseparator {
 
 /* Expanded on hover: a floating panel over the page.
    The pinned sidebar shows macOS's own window background, which CSS can't
-   reach (no native material can be applied to an element), and LibreWolf
+   reach (no native material can be applied to an element), and Firefox
    paints the floating one near-black. The shortcut script measures the
    pinned sidebar (on theme, appearance and wallpaper changes) into
    --arc-sidebar-dark / --arc-sidebar-light; until then, the values measured
@@ -1371,7 +1371,7 @@ panel toolbarseparator {
 }
 
 /* ---------- Fullscreen ---------- */
-/* When the macOS menu bar slides in, LibreWolf shifts the toolbar down with
+/* When the macOS menu bar slides in, Firefox shifts the toolbar down with
    `translate`. A translated toolbar becomes the frame of the floating URL bar
    inside it, which then centered itself in the 260px toolbar (spilling over
    the sidebar) instead of the window. Same shift, made with `top`. */
@@ -1403,7 +1403,7 @@ panel toolbarseparator {
   transition: none !important;
 }
 
-/* While fullscreen considers the chrome hidden, LibreWolf skips drawing the
+/* While fullscreen considers the chrome hidden, Firefox skips drawing the
    sidebar's contents (content-visibility: hidden) but still paints its
    background, so hovering showed an empty gray panel first. */
 :root[sidebar-expand-on-hover][fullscreenNavToolboxHidden]:not([inDOMFullscreen]) #sidebar-container {
@@ -1513,7 +1513,7 @@ panel toolbarseparator {
 
 /* ---------- Script check ----------
    The shortcut script marks every window it runs in ([arc-script]). Without
-   it (typically after a LibreWolf update, which replaces the app and the
+   it (typically after a Firefox update, which replaces the app and the
    script with it), a quiet notice says how to put it back. It waits a few
    seconds, so it never flashes while the script is still starting. */
 @keyframes arc-notice-in {
@@ -1527,7 +1527,7 @@ panel toolbarseparator {
 
 /* at the bottom of the tab list, above the sidebar's bottom buttons */
 :root:not([arc-script]) #vertical-tabs::after {
-  content: "The Arc script isn't running. Run arc-shortcut/install.sh, then restart LibreWolf.";
+  content: "The Arc script isn't running. Run arc-shortcut/install.sh, then restart Firefox.";
   position: absolute;
   inset-inline: var(--arc-sidebar-inset);
   bottom: 8px;
@@ -1897,7 +1897,7 @@ split-view-footer {
   opacity: 0 !important;
 }
 
-/* A page's area has the empty page's own color from the start (LibreWolf
+/* A page's area has the empty page's own color from the start (Firefox
    paints it gray until the first page is drawn, a change of shade at
    launch); a page draws its own over it */
 #tabbrowser-tabpanels .browserContainer {

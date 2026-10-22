@@ -27,7 +27,7 @@
         el.animate(open ? [none, full] : [full, none], { id: "arc-fold", duration: open ? 280 : 220, easing: CURVE.settle })
           .finished.then(finish, finish);
       };
-      // Closing: LibreWolf selects the next tab at once and removes the row
+      // Closing: Firefox selects the next tab at once and removes the row
       // in _endRemoveTab, which it can call late (it does, after its own
       // closing animation, in the horizontal tab bar): the row slides shut
       // first. Asked again while sliding (closing a window, say), it goes now.
@@ -92,7 +92,7 @@
         doc.getElementById("tabbrowser-arrowscrollbox-periphery"),
       ].filter(Boolean);
       // (where each item is, and whether it's a tile. A drop glides too,
-      // except the dropped tab, which LibreWolf moves into place itself.)
+      // except the dropped tab, which Firefox moves into place itself.)
       const notePlaces = ({ dropping = false } = {}) => {
         if (reducedMotion() || dragRoot.hasAttribute("arc-starting") || (!dropping && dragRoot.hasAttribute("arc-dragging"))) {
           return null;
@@ -101,7 +101,7 @@
         return new Map(items.map(el => [el, [el.getBoundingClientRect(), !!el.pinned]]));
       };
       // (measured right away, so the first frame drawn is already the start
-      // of the glide, never the end; after a drop, a frame later: LibreWolf
+      // of the glide, never the end; after a drop, a frame later: Firefox
       // moves the tabs once our drop handler is done)
       const glideFrom = (places, { nextFrame = false } = {}) => {
         if (!places) {
@@ -162,7 +162,7 @@
         glideFrom(places);
       };
       guard("pin glide from the menu", () => {
-        // (LibreWolf's own Pin Tab / Unpin Tab menu items too)
+        // (Firefox's own Pin Tab / Unpin Tab menu items too)
         for (const id of ["context_pinTab", "context_unpinTab", "context_pinSelectedTabs", "context_unpinSelectedTabs"]) {
           doc.getElementById(id)?.addEventListener("command", () => glideFrom(notePlaces()), true);
         }

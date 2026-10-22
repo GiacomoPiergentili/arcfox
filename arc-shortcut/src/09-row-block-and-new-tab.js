@@ -17,7 +17,7 @@
             leavingFolder.add(tab);
           }
           win.setTimeout(() => {
-            // (one opened into a split view, e.g. LibreWolf's "choose a tab"
+            // (one opened into a split view, e.g. Firefox's "choose a tab"
             // page or a restored split view, stays there)
             if (!tab.isConnected || tab.pinned || isRow(tab) || tab.splitview) {
               return;
@@ -39,7 +39,7 @@
           }, 0);
         });
 
-        // No new tab from the tab list's empty space: LibreWolf opens one on a
+        // No new tab from the tab list's empty space: Firefox opens one on a
         // double-click there (which includes the gaps between rows, so it
         // seemed random) or a middle-click below the last tab, bypassing the
         // New Tab command and its floating URL bar. Middle-clicking a tab or a
@@ -59,8 +59,8 @@
       });
 
       // --- + New Tab right under the divider (as in Arc) ---
-      // userChrome.css shows LibreWolf's end-of-list box (which holds the
-      // button) there. While dragging, LibreWolf measures that box as the end
+      // userChrome.css shows Firefox's end-of-list box (which holds the
+      // button) there. While dragging, Firefox measures that box as the end
       // of the tab list, so it's told where the list really ends.
       const periphery = doc.getElementById("tabbrowser-arrowscrollbox-periphery");
       let listEndScreenY = null;

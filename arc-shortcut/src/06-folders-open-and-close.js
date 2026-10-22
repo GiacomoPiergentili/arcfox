@@ -1,11 +1,11 @@
       // --- folders opening and closing ---
       // A collapsed folder keeps showing its loaded tabs (unloaded ones hide;
-      // LibreWolf showed only the selected one and a "+N" for the rest), and
+      // Firefox showed only the selected one and a "+N" for the rest), and
       // its rows slide open and shut (as in the Finder's sidebar). The
       // folder icon's front tilts open with it (userChrome.css).
       const folderClass = win.customElements.get("tab-group");
       const isLoaded = tab => !tab.hasAttribute("pending");
-      // (what LibreWolf's own code counts as shown: keyboard moves, drags)
+      // (what Firefox's own code counts as shown: keyboard moves, drags)
       const showLoadedTabs = original => function (tab) {
         return original.call(this, tab) ||
           (this.collapsed && !this.isBeingDragged && !tab.splitview && isLoaded(tab));
@@ -33,7 +33,7 @@
         },
       });
       // a tab in a collapsed folder loading or unloading shows or hides it:
-      // LibreWolf's list of shown tabs must hear about it
+      // Firefox's list of shown tabs must hear about it
       guard("folders: loaded tabs stay in view", () => {
         new win.MutationObserver(records => {
           if (records.some(r => r.target.group?.collapsed)) {

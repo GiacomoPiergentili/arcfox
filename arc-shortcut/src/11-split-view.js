@@ -1,9 +1,9 @@
       // --- split view by drag and drop (as in Arc) ---
       // Dragging a tab over the page shows two drop zones (#arc-split-drop,
       // over the page: the page itself can't receive tab drags); dropping
-      // opens it beside the current page, on that side, with LibreWolf's own
+      // opens it beside the current page, on that side, with Firefox's own
       // split view. Normal tabs and pinned rows (a split view with a row sits
-      // in the row's spot, see isSplit); not tiles: LibreWolf keeps its pinned
+      // in the row's spot, see isSplit); not tiles: Firefox keeps its pinned
       // tabs out of split views. A tab can come from another window too.
       const splitView = guard("split view", () => {
         const splitDrop = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
@@ -66,7 +66,7 @@
             showSplitDrop(tab, partner, false);
           } else {
             // No split possible (or a folder, a split pair): the page still takes the drop and does nothing
-            // with it (LibreWolf would tear the tab off into a new window when
+            // with it (Firefox would tear the tab off into a new window when
             // it's dropped anywhere past the sidebar; as in Arc and Safari, only
             // a drop outside the window does)
             showSplitDrop(null, null, false);
@@ -156,7 +156,7 @@
             if (canSplit(dragged) && canSplit(partner) && dragged !== partner) {
               gBrowser.addTabSplitView(onLeft ? [dragged, partner] : [partner, dragged], { insertBefore: partner });
               gBrowser.selectedTab = dragged;
-              // LibreWolf clears the offset a dragged tab follows the pointer
+              // Firefox clears the offset a dragged tab follows the pointer
               // with only from tabs outside split views
               const tabs = [dragged, partner];
               const clear = () => tabs.forEach(t => t.style.removeProperty("transform"));
@@ -169,9 +169,9 @@
         });
         win.addEventListener("dragend", hideSplitDrop, true);
         win.addEventListener("drop", () => win.setTimeout(() => splitForeign && hideSplitDrop(), 0), true);
-        // However a split view is made (drop, right-click menu, LibreWolf's
+        // However a split view is made (drop, right-click menu, Firefox's
         // "choose a tab" page): one with a row goes in the row's spot, and a
-        // tile is left out (LibreWolf would make a split view of one page)
+        // tile is left out (Firefox would make a split view of one page)
         // (and the two tabs, with whatever moves for them, glide into place:
         // see "motion" above)
         let splitAnchor = null; // the row whose spot a new split view takes
@@ -190,7 +190,7 @@
             glideFrom(places);
           }
         };
-        // (LibreWolf adds the tabs one by one through this, and its "choose a
+        // (Firefox adds the tabs one by one through this, and its "choose a
         // tab" page through it too)
         const rowJoins = original => (tab, split, ...rest) => {
           if (tab && split && isRow(tab) && !tab.splitview) {

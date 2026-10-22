@@ -1,6 +1,6 @@
       // --- auto-archive (as in Arc) ---
       // Normal tabs left unused for arc.archiveAfterHours (24 by default, 0 =
-      // off) close by themselves, quietly; they're in LibreWolf's recently
+      // off) close by themselves, quietly; they're in Firefox's recently
       // closed tabs (Cmd+Shift+T). Never: tiles, pinned rows and folders, the
       // current tab, the empty page, or tabs playing sound, in
       // picture-in-picture, sharing the camera / mic / screen or loading.

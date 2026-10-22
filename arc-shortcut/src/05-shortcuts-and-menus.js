@@ -37,7 +37,7 @@
             gBrowser.pinTab(tab);
           } else {
             gBrowser.unpinTab(tab);
-            moveToRowBlockEnd(tab); // (LibreWolf puts it first, above the rows)
+            moveToRowBlockEnd(tab); // (Firefox puts it first, above the rows)
           }
         }
       };
@@ -45,7 +45,7 @@
         const key = doc.getElementById(keyId);
         if (key) {
           key.removeAttribute("command");
-          // (and not on to LibreWolf's own handler for the key set, which
+          // (and not on to Firefox's own handler for the key set, which
           // opened "Bookmark All Tabs" too)
           key.addEventListener("command", e => {
             e.stopPropagation();
@@ -121,7 +121,7 @@
       });
 
       // Cmd+1…9 go to the tiles in order, then on to the pinned rows (a
-      // collapsed folder's hidden rows don't count). LibreWolf's own (the 1st to 8th
+      // collapsed folder's hidden rows don't count). Firefox's own (the 1st to 8th
       // tab, the last tab) counted every tab, rows and folders in between.
       const pinnedInOrder = () => [
         ...gBrowser.tabs.filter(t => t.pinned),
@@ -160,7 +160,7 @@
       // on any Mac app (they were keys only): Pin as Row / Tile in the Window
       // menu (where Safari has Pin Tab), the sidebar in View, Copy Link in
       // Edit. Their keys are new ones of ours, only there to show the
-      // shortcut in the menu (LibreWolf's own for these keys are switched
+      // shortcut in the menu (Firefox's own for these keys are switched
       // off); the key presses themselves are caught above.
       guard("menu bar", () => {
         const keyset = doc.getElementById("mainKeyset");

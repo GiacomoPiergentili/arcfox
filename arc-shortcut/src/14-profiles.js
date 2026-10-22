@@ -1,10 +1,10 @@
-      // --- profile switcher (Arc's Space switcher, with LibreWolf profiles) ---
+      // --- profile switcher (Arc's Space switcher, with Firefox profiles) ---
       // In the middle of the sidebar's bottom row: the profiles' avatars
       // (as many as fit, the current one always; hover for the name). A
       // click on another profile brings its window forward (or starts it).
-      // New profiles are made from LibreWolf's Profiles menu (and set up on
+      // New profiles are made from Firefox's Profiles menu (and set up on
       // their first run, see above). Hidden in private windows and when
-      // LibreWolf's profiles are off.
+      // Firefox's profiles are off.
       guard("profile switcher", () => {
         const profilesBox = doc.createElementNS("http://www.w3.org/1999/xhtml", "div");
         profilesBox.id = "arc-profiles";
@@ -76,7 +76,7 @@
             profilesBox.hidden = true;
             return;
           }
-          // LibreWolf's profile service starts up in its own time: at launch it
+          // Firefox's profile service starts up in its own time: at launch it
           // had no profiles to give yet
           try {
             if (!profileService.initialized) {
@@ -104,7 +104,7 @@
           }, { once: true });
           // (drawn before the window's contents fade in)
           startupWaits.push(refreshProfiles());
-          // (and once LibreWolf has settled, in case it was still busy)
+          // (and once Firefox has settled, in case it was still busy)
           SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(refreshProfiles, 1000));
         }
         // the sidebar resized: recount what fits

@@ -1,8 +1,8 @@
       // --- drag and drop ---
       // Dropped above the divider (inside the row block) -> pinned row; below
       // it -> normal tab. The divider position is taken when the drag starts,
-      // before LibreWolf shifts anything. Tiles are LibreWolf's own business,
-      // except that LibreWolf puts an unpinned tile first; it goes where it
+      // before Firefox shifts anything. Tiles are Firefox's own business,
+      // except that Firefox puts an unpinned tile first; it goes where it
       // was dropped instead.
       const TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
       let dividerY = null;
@@ -11,14 +11,14 @@
       let folderSlot = 0; // height of a folder being dragged
       let newTabTop = null; // where + New Tab was when a folder drag started
       let firstSlotTop = null;
-      // How far a tab is drawn from its place while dragging: LibreWolf's own
+      // How far a tab is drawn from its place while dragging: Firefox's own
       // offsets (style top + transform) plus [arc-make-room]
       const shiftOf = t =>
         (parseFloat(t.style.top) || 0) +
         (Number(/translateY\((-?[\d.]+)px\)/.exec(t.style.transform)?.[1]) || 0) +
         (t.hasAttribute("arc-make-room") ? slotHeight : 0);
       let pendingDrop = null;
-      // What LibreWolf moves while dragging: tabs and folder labels (their
+      // What Firefox moves while dragging: tabs and folder labels (their
       // container), visible ones only (a collapsed folder's tabs aren't)
       const movables = () =>
         gBrowser.tabContainer.dragAndDropElements
@@ -32,7 +32,7 @@
       // Would a drop at this height make a pinned row?
       const headsForRow = y => !isOverTiles(y) && dividerY !== null && y < dividerY;
       // A tab dropped on the tiles becomes a tile there, not at the end
-      // (LibreWolf just pins it): the place under the pointer, in reading
+      // (Firefox just pins it): the place under the pointer, in reading
       // order. The tiles' cells are measured once per drag, as they stand.
       const stillTiles = () => gBrowser.tabs.filter(t => t.pinned && !t.hasAttribute("dragtarget"));
       let tileCells = null;
@@ -108,12 +108,12 @@
         }
       };
       guard("drag and drop: tiles", () => {
-        // Place it in the same frame LibreWolf unpins it, so it never shows up
+        // Place it in the same frame Firefox unpins it, so it never shows up
         // at the top first
         gBrowser.tabContainer.addEventListener("TabPinned", e => {
           const drop = pendingDrop;
           if (drop?.tileBefore && drop.moving.includes(e.target)) {
-            // once LibreWolf is done with the drop (it moves the tab itself
+            // once Firefox is done with the drop (it moves the tab itself
             // after pinning it), still before the next frame
             const tab = e.target;
             Promise.resolve().then(() => {
@@ -131,7 +131,7 @@
             if (drop.toRow) {
               setRow(tab, true);
             }
-            // again once LibreWolf is done with the drop: it moves the tab
+            // again once Firefox is done with the drop: it moves the tab
             // itself after unpinning it (into a folder only we know about)
             Promise.resolve().then(() => tab.isConnected && !tab.pinned && placeAt(tab, drop.y, drop.moving));
           }
@@ -176,7 +176,7 @@
             // it's lifted out of the layout while dragged: + New Tab keeps its place
             const cs = win.getComputedStyle(folderLabel);
             folderSlot = folderLabel.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
-            // LibreWolf folds the folder up while it's dragged: + New Tab and
+            // Firefox folds the folder up while it's dragged: + New Tab and
             // what's below keep their place (the space is held, see dragover)
             const group = folderLabel.closest("tab-group");
             newTabTop = periphery?.getBoundingClientRect().top ?? null;
@@ -200,7 +200,7 @@
           }
           const first = listItems()[0];
           if (!listItems().some(inBlock) && draggedTab && draggedTab === first) {
-            // no rows yet and the first tab itself is dragged (LibreWolf can't
+            // no rows yet and the first tab itself is dragged (Firefox can't
             // move it any higher): nudging it up is enough
             dividerY = startMids.find(m => m.tab === draggedTab).mid - 6;
           } else {
@@ -265,7 +265,7 @@
           }
         });
       });
-      // On macOS LibreWolf swaps in a page thumbnail once it's captured
+      // On macOS Firefox swaps in a page thumbnail once it's captured
       // (updateDragImage); ignore that for tab drags
       const noThumbnailForTabs = original => function (...args) {
         if (this.mozTypesAt?.(0)?.[0] === TAB_DROP_TYPE) {
@@ -323,7 +323,7 @@
           // always stays pinned: no cue)
           const toRow = !folderSlot && headsForRow(e.clientY);
           dragRoot.toggleAttribute("arc-drop-row", toRow);
-          // + New Tab follows the rows: as far as LibreWolf has moved the last
+          // + New Tab follows the rows: as far as Firefox has moved the last
           // one, and a slot down while the dragged tab is headed for them
           const rows = movables().filter(el => inBlockEl(el) && !el.hasAttribute("dragtarget"));
           const shift = folderSlot || tabOverTiles ? 0 : Math.max(rows.length ? shiftOf(rows.at(-1)) : 0, toRow ? slotHeight : 0);
@@ -373,7 +373,7 @@
         gBrowser.tabContainer.addEventListener("drop", endDrag, true);
         // Leaving the sidebar doesn't end the drag (it may come back, e.g.
         // after a detour over the page): only the cues that follow the pointer
-        // go; LibreWolf keeps everything else as it was until the drop
+        // go; Firefox keeps everything else as it was until the drop
         gBrowser.tabContainer.addEventListener("dragleave", e => {
           if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
             closeTileGap();
@@ -386,7 +386,7 @@
           }
         }, true);
         // A drag that ended without reaching us (dropped outside the window,
-        // cancelled): the next click proves it's over, as LibreWolf assumes too
+        // cancelled): the next click proves it's over, as Firefox assumes too
         win.addEventListener("mousedown", e => {
           if (e.button === 0 && dragRoot.hasAttribute("arc-dragging")) {
             endDrag();
