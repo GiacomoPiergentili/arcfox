@@ -3059,29 +3059,54 @@ try {
           let closeTimer = null;
           let blurClosedAt = -1000; // when the bar last closed because focus left it
           let loading = false;
+          // Closing, it fades out where it is (as Spotlight does), then goes
+          // back to the sidebar; the page has the focus at once
+          let fading = null;
+          const backInSidebar = revert => {
+            fading?.cancel();
+            fading = null;
+            root.removeAttribute("arc-newtab-fading");
+            // without the sidebar bar's width animation
+            root.setAttribute("arc-newtab-closing", "");
+            win.requestAnimationFrame(() => win.requestAnimationFrame(() =>
+              root.removeAttribute("arc-newtab-closing")));
+            // Nothing was opened, or another tab was picked: show the current
+            // tab's address (held back while the bar was open)
+            if (revert) {
+              gURLBar.handleRevert();
+            }
+          };
           const closeBar = () => {
             win.clearTimeout(closeTimer);
             closeTimer = null;
             if (!barOpen()) {
               return;
             }
+            const revert = !loading;
             root.removeAttribute("arc-newtab-bar");
-            // back in the sidebar at once, without its width animation
-            root.setAttribute("arc-newtab-closing", "");
-            win.requestAnimationFrame(() => win.requestAnimationFrame(() =>
-              root.removeAttribute("arc-newtab-closing")));
             // After Enter, LibreWolf handles the address and the focus
-            if (!loading) {
-              if (gURLBar.focused) {
-                gBrowser.selectedBrowser.focus();
-              }
-              // Nothing was opened, or another tab was picked: show the
-              // current tab's address (held back while the bar was open)
-              gURLBar.handleRevert();
+            if (!loading && gURLBar.focused) {
+              gBrowser.selectedBrowser.focus();
             }
             loading = false;
+            const bar = doc.getElementById("urlbar");
+            if (!bar || win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+              backInSidebar(revert);
+              return;
+            }
+            root.setAttribute("arc-newtab-fading", "");
+            const anim = bar.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.97 }],
+              { duration: 160, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+            fading = anim;
+            anim.finished.then(() => fading === anim && backInSidebar(revert), () => {});
           };
           const openBar = () => {
+            // (opened again while still fading out: straight back)
+            if (fading) {
+              fading.cancel();
+              fading = null;
+              root.removeAttribute("arc-newtab-fading");
+            }
             root.setAttribute("arc-newtab-bar", "");
             gURLBar.focus();
             gURLBar.value = "";

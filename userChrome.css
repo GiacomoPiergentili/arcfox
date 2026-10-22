@@ -1158,8 +1158,9 @@ panel toolbarseparator {
    floating edit ([arc-floating-urlbar], set by the shortcut script) the mark
    alone keeps it floating, so LibreWolf briefly dropping [focused] while the
    sidebar moves can't make it blink. The new tab bar (Cmd+T / + New Tab,
-   [arc-newtab-bar] from the script) floats even with the sidebar shown. */
-:root:is([arc-newtab-bar], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) {
+   [arc-newtab-bar] from the script) floats even with the sidebar shown,
+   and stays there while it fades out after closing ([arc-newtab-fading]). */
+:root:is([arc-newtab-bar], [arc-newtab-fading], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) {
   #urlbar-container {
     opacity: 1 !important;
     pointer-events: auto !important;
@@ -1261,7 +1262,7 @@ panel toolbarseparator {
   to   { opacity: 1; scale: 1; }
 }
 
-:root:is([arc-newtab-bar], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) #urlbar {
+:root:is([arc-newtab-bar], [arc-newtab-fading], [sidebar-expand-on-hover]:is([arc-floating-urlbar], :has(#sidebar-container:not([sidebar-launcher-expanded], [sidebar-ongoing-animations])):has(#urlbar[focused], #urlbar-container:hover, #urlbar .searchmode-switcher[aria-expanded="true"], #urlbar .searchmode-switcher-panel-list:is([open], [showing])))) #urlbar {
   animation: arc-pop-in var(--arc-pop-duration) var(--arc-ease-open) both;
 }
 
@@ -1286,7 +1287,7 @@ panel toolbarseparator {
    an edit that started in the floating bar is in progress. The bar then
    stays in the window even if the sidebar opens, and the sidebar shows an
    empty field in its place. */
-:root:is([arc-floating-urlbar], [arc-newtab-bar]) #nav-bar::after {
+:root:is([arc-floating-urlbar], [arc-newtab-bar], [arc-newtab-fading]) #nav-bar::after {
   content: "";
   position: absolute;
   left: var(--arc-sidebar-inset);
