@@ -346,7 +346,7 @@ sidebar-main {
       background-color: var(--tab-group-color);
       transform-origin: 50% 100%;
       transform: perspective(20px) rotateX(0deg);
-      transition: transform 280ms var(--arc-ease-open), width 280ms var(--arc-ease-open), background-color 280ms var(--arc-ease-open);
+      transition: transform var(--arc-open-duration) var(--arc-ease-open), width var(--arc-open-duration) var(--arc-ease-open), background-color var(--arc-open-duration) var(--arc-ease-open);
     }
   }
 }
@@ -432,7 +432,7 @@ sidebar-main {
 
 /* eased while dragging; on drop it snaps, as the tabs land in place */
 :root[arc-dragging] #tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery {
-  transition: translate 200ms ease !important;
+  transition: translate calc(var(--arc-drag-duration) * 4 / 3) ease !important;
 }
 
 /* Keep it there with long tab lists too, instead of LibreWolf's second
@@ -489,12 +489,12 @@ sidebar-main {
    script slides them one cell along, and grows the grid a line if needed),
    and the rows stay where they are meanwhile ([arc-tab-over-tiles]) */
 :root[arc-dragging] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[pinned]:not([dragtarget]) {
-  transition: translate 150ms ease !important;
+  transition: translate var(--arc-drag-duration) ease !important;
 }
 
 :root[arc-dragging] #pinned-tabs-container {
   padding-block-end: var(--arc-tiles-grow, 0px) !important;
-  transition: padding-block-end 150ms ease !important;
+  transition: padding-block-end var(--arc-drag-duration) ease !important;
 }
 
 :root[arc-tab-over-tiles] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned], [dragtarget]), .tab-group-label-container, tab-split-view-wrapper) {
@@ -536,7 +536,7 @@ sidebar-main {
 
 /* ...and the tabs below the pointer make room for it */
 :root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned]), .tab-group-label-container) {
-  transition: translate 150ms ease !important;
+  transition: translate var(--arc-drag-duration) ease !important;
 }
 
 :root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] :is(.tabbrowser-tab:not([pinned]), .tab-group-label-container)[arc-make-room] {
@@ -605,9 +605,11 @@ sidebar-main {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-inline: 2px;
+  /* 20px: the Mac's smallest comfortable click target (the dot itself
+     stays 6px) */
+  width: 20px;
+  height: 20px;
+  margin-inline: 0;
   border-radius: 50%;
 
   &::before {
@@ -652,8 +654,8 @@ sidebar-main {
 
   .arc-home-dot {
     position: absolute;
-    top: 2px;
-    inset-inline-end: 2px;
+    top: 0;
+    inset-inline-end: 0;
     margin: 0;
   }
 }
@@ -1073,6 +1075,7 @@ panel toolbarseparator {
   --arc-close-duration: 220ms;
   --arc-pop-duration: 180ms;     /* floating bar appearing */
   --arc-hover-duration: 150ms;   /* tab / button hover */
+  --arc-drag-duration: 150ms;    /* things making room during a drag */
   --arc-ease-open: cubic-bezier(0.32, 0.72, 0, 1);
   --arc-ease-close: cubic-bezier(0.4, 0, 1, 1);
   --arc-command-bar-width: min(680px, 80vw); /* floating URL bar when the sidebar is hidden */
@@ -1279,6 +1282,27 @@ panel toolbarseparator {
     --arc-close-duration: 0ms;
     --arc-pop-duration: 0ms;
     --arc-hover-duration: 0ms;
+    --arc-drag-duration: 0ms;
+  }
+}
+
+/* Increase Contrast (System Settings > Accessibility > Display): stronger
+   lines, fills and secondary text, as Apple's own apps do */
+@media (prefers-contrast: more) {
+  :root {
+    --arc-hairline: light-dark(rgba(0, 0, 0, 0.32), rgba(255, 255, 255, 0.32));
+    --arc-fill-hover: light-dark(rgba(0, 0, 0, 0.10), rgba(255, 255, 255, 0.13));
+    --arc-fill-selected: light-dark(rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.22));
+    --arc-field: light-dark(rgba(0, 0, 0, 0.10), rgba(255, 255, 255, 0.14));
+    --arc-fill-tile-hover: light-dark(rgba(0, 0, 0, 0.16), rgba(255, 255, 255, 0.20));
+    --arc-label-secondary: light-dark(rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.78));
+    --arc-focus-ring: AccentColor;
+  }
+
+  /* the selected row also gets an outline, not just a fill */
+  #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab:is([selected], [multiselected]) .tab-background {
+    outline: 1px solid light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.4)) !important;
+    outline-offset: -1px !important;
   }
 }
 

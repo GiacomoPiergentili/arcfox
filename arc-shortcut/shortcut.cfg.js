@@ -158,10 +158,9 @@ try {
       doc.documentElement.setAttribute("arc-script", "");
       // (a window is open: LibreWolf is far enough along for this)
       win.setTimeout(hookAltPeek, 0);
-      // A profile's first run with this setup (a new profile, made with the
-      // switcher's + or not): the settings the layout relies on, once; what
-      // you change later stays. (The look's own three settings are written
-      // into a new profile before its first start, see the profile switcher.)
+      // A profile's first run with this setup: the settings the layout relies
+      // on, once; what you change later stays. (A profile without the look
+      // gets it linked here too, see below.)
       if (!prefs.getBoolPref("arc.profileDefaultsApplied", false)) {
         const setIfDefault = (name, value) => {
           try {
@@ -1183,6 +1182,74 @@ try {
         }
       }, true);
 
+      // --- the menu bar ---
+      // Every command has its place in the menu bar with its shortcut, as
+      // on any Mac app (they were keys only): Pin as Row / Tile in the Window
+      // menu (where Safari has Pin Tab), the sidebar in View, Copy Link in
+      // Edit. Their keys are new ones of ours, only there to show the
+      // shortcut in the menu (LibreWolf's own for these keys are switched
+      // off); the key presses themselves are caught above.
+      const keyset = doc.getElementById("mainKeyset");
+      const menuKey = (id, key, modifiers) => {
+        if (!doc.getElementById(id) && keyset) {
+          const k = doc.createXULElement("key");
+          k.id = id;
+          k.setAttribute("key", key);
+          k.setAttribute("modifiers", modifiers);
+          keyset.append(k);
+        }
+        return id;
+      };
+      const menuItem = (id, keyId, action) => {
+        const item = doc.createXULElement("menuitem");
+        item.id = id;
+        if (keyId) {
+          item.setAttribute("key", keyId);
+        }
+        item.addEventListener("command", action);
+        return item;
+      };
+      const windowMenu = doc.getElementById("windowPopup");
+      if (windowMenu) {
+        const rowItem = menuItem("arc-menu-row", menuKey("arc-key-row", "D", "accel"), () => run(withGlide(toggleRow), "menu"));
+        const tileItem = menuItem("arc-menu-tile", menuKey("arc-key-tile", "D", "accel,shift"), () => run(withGlide(toggleTile), "menu"));
+        windowMenu.prepend(rowItem, tileItem, doc.createXULElement("menuseparator"));
+        windowMenu.addEventListener("popupshowing", e => {
+          if (e.target !== windowMenu) {
+            return;
+          }
+          const tab = gBrowser.selectedTab;
+          const blank = tab.hasAttribute("arc-start-page");
+          rowItem.setAttribute("label", isRow(tab) ? "Unpin Row" : "Pin as Row");
+          tileItem.setAttribute("label", tab.pinned ? "Unpin Tile" : "Pin as Tile");
+          rowItem.toggleAttribute("disabled", blank);
+          tileItem.toggleAttribute("disabled", blank);
+        });
+      }
+      const viewMenu = doc.getElementById("menu_viewPopup");
+      if (viewMenu) {
+        const sidebarItem = menuItem("arc-menu-sidebar", "key_savePage", toggleSidebarMode);
+        doc.getElementById("viewSidebarMenuMenu")?.after(sidebarItem);
+        viewMenu.addEventListener("popupshowing", e => {
+          if (e.target === viewMenu) {
+            sidebarItem.setAttribute("label",
+              prefs.getStringPref(PREF, "always-show") === "expand-on-hover" ? "Always Show Sidebar" : "Auto-Hide Sidebar");
+          }
+        });
+      }
+      const editMenu = doc.getElementById("menu_EditPopup");
+      if (editMenu) {
+        const copyItem = menuItem("arc-menu-copy-link", menuKey("arc-key-copy-link", "C", "accel,shift"), copyAddress);
+        copyItem.setAttribute("label", "Copy Link");
+        (doc.getElementById("menu_delete") || doc.getElementById("menu_paste"))?.after(copyItem);
+        editMenu.addEventListener("popupshowing", e => {
+          if (e.target === editMenu) {
+            const url = gBrowser.selectedBrowser.currentURI?.spec;
+            copyItem.toggleAttribute("disabled", !url || win.isBlankPageURL(url) || gBrowser.selectedTab.hasAttribute("arc-start-page"));
+          }
+        });
+      }
+
       // --- folders opening and closing ---
       // A collapsed folder keeps showing its loaded tabs (unloaded ones hide;
       // LibreWolf showed only the selected one and a "+N" for the rest), and
@@ -1528,6 +1595,9 @@ try {
           ...gBrowser.tabContainer.querySelectorAll(".tabbrowser-tab:not([pinned]):not([dragtarget]), .tabbrowser-tab[pinned][dragtarget], .tab-group-label-container, tab-split-view-wrapper"),
           periphery,
         ].filter(Boolean);
+        if (win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          return;
+        }
         const before = new Map(items.map(el => [el, el.getBoundingClientRect().top]));
         // (before the next frame is drawn; transform, as + New Tab's translate
         // is fixed in userChrome.css)

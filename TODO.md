@@ -14,6 +14,7 @@ Nothing queued.
 
 
 ## Known limitations
+- Apple guidelines, not done: the pinned page dot can't take keyboard focus (its action is in the tab's context menu); the sidebar can't be translucent (LibreWolf allows no blur behind its own interface); our few labels are English only.
 
 - The auto-hide sidebar is one flat color; themes that shade the pinned sidebar from edge to edge (Nova Ash does, slightly) match it in the middle, within a shade. With the sidebar kept on auto-hide, a wallpaper change is picked up the next time it's pinned (Cmd+S).
 - Multiple windows: if two windows change the sidebar within the same half second, the later save wins. Whether a folder is open or closed stays per window. A change of a tile's icon alone reaches other windows with the next other change.
@@ -65,3 +66,4 @@ Nothing queued.
 - [x] More motion: a selected tile's colors fade in and out; the away dot pops in; split views glide together and apart; other windows glide when they follow a change.
 - [x] Animation check, frame by frame (frozen refresh driver + window-only screenshots): fixed a new tab's row drawn full height for a frame before sliding, glides starting a frame late, a gliding tab showing through the rows it crosses, tiles that only resized fading in and out (and overlapping as they moved), the grow-in never actually fading, Cmd+Shift+D also opening "Bookmark All Tabs" when run as a command, and a pinned page with no icon keeping the old page's icon on reset.
 - [x] The Cmd+T bar fades out where it is when it closes (as Spotlight does), then goes back to the sidebar.
+- [x] Apple guidelines review: commands in the menu bar with their shortcuts; Increase Contrast; Reduce Motion for the drop glide, drag reactions and folder icon; the pinned page dot's click area 20px.

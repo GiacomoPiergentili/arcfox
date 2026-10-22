@@ -478,6 +478,34 @@ gBrowser.removeTab(a, {animate: false}); gBrowser.removeTab(b, {animate: false})
 return result({});
 """),
 
+    ("Apple guidelines: menu bar commands, Increase Contrast, Reduce Motion", r"""
+const show = id => document.getElementById(id).dispatchEvent(new Event("popupshowing"));
+const n = gBrowser.tabs.find(x => x.label === "Normal 2");
+gBrowser.selectedTab = n; await wait(400);
+for (const id of ["windowPopup", "menu_viewPopup", "menu_EditPopup"]) show(id);
+const item = id => document.getElementById(id);
+check(item("arc-menu-row")?.parentNode.id === "windowPopup" && item("arc-menu-row").getAttribute("label") === "Pin as Row", "Window menu: Pin as Row");
+check(item("arc-menu-tile")?.getAttribute("label") === "Pin as Tile", "Window menu: Pin as Tile");
+check(document.getElementById(item("arc-menu-row").getAttribute("key"))?.getAttribute("modifiers") === "accel", "...with ⌘D shown");
+check(item("arc-menu-sidebar")?.parentNode.id === "menu_viewPopup" && /Sidebar$/.test(item("arc-menu-sidebar").getAttribute("label")), "View menu: the sidebar, with ⌘S");
+check(item("arc-menu-copy-link")?.parentNode.id === "menu_EditPopup", "Edit menu: Copy Link");
+item("arc-menu-row").doCommand(); await wait(700);
+show("windowPopup");
+check(isRow(n) && item("arc-menu-row").getAttribute("label") === "Unpin Row", "the menu item pins, and then offers to unpin");
+item("arc-menu-row").doCommand(); await wait(700);
+check(!isRow(n), "...and unpins");
+const hair = () => getComputedStyle(root).getPropertyValue("--arc-hairline");
+const normal = hair();
+Services.prefs.setIntPref("ui.useAccessibilityTheme", 1); await wait(500);
+check(hair() !== normal, "Increase Contrast strengthens the lines: " + hair());
+Services.prefs.clearUserPref("ui.useAccessibilityTheme"); await wait(300);
+Services.prefs.setIntPref("ui.prefersReducedMotion", 1); await wait(400);
+check(getComputedStyle(root).getPropertyValue("--arc-drag-duration").trim() === "0ms", "Reduce Motion stops the drag animations");
+check(getComputedStyle(gBrowser.tabGroups[0].querySelector(".tab-group-label"), "::after").transitionDuration.split(",").every(d => parseFloat(d) === 0), "...and the folder icon's tilt");
+Services.prefs.clearUserPref("ui.prefersReducedMotion"); await wait(300);
+return result({});
+"""),
+
     ("auto-hide mode: tiles stay a centered grid", r"""
 Services.prefs.setStringPref("sidebar.visibility", "expand-on-hover"); await wait(1500);
 SidebarController._state.launcherExpanded = true; await wait(1500);

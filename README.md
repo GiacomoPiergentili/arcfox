@@ -77,6 +77,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - macOS sidebar typography (13px) on 32px rows with 4px gaps; 40px tiles 8px apart; every icon and title on shared columns.
 - Menus as macOS menus; dialog-like panels (Translate, Edit Bookmark) as macOS popovers.
 - One set of design tokens at the top of `userChrome.css` (`--arc-*`): spacing, radii, fills, shadows, motion. Changing a size there updates every derived spacing.
+- **Apple's guidelines**: every command is in the menu bar with its shortcut (Window → Pin as Row / Pin as Tile, View → Always Show / Auto-Hide Sidebar, Edit → Copy Link); Increase Contrast strengthens lines, fills and secondary text and outlines the selected row; Reduce Motion turns off every slide, glide and drag animation (fades stay); every click target is at least 20×20.
 
 ## Keyboard
 
@@ -91,6 +92,8 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 | Cmd+1…9 | Go to the tiles in order, then on to the pinned rows |
 | Option+click a link | Open it in Peek |
 | Esc | Close the command bar, or a Peek |
+
+The commands above are also in the menu bar, with their shortcuts: Window → Pin as Row / Pin as Tile, View → Always Show / Auto-Hide Sidebar, Edit → Copy Link.
 
 ## Install
 
@@ -164,6 +167,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 23. **Folders open and close**: a collapsed folder keeps its loaded tabs in view instead of a "+N"; rows slide open and shut, and the folder icon opens and shuts with them.
 24. **Motion**: tabs slide open and shut; pinning and unpinning glide everything to its new place; closing a pinned row or tile settles it back in place.
 25. **More motion**: tile colors fade, the away dot pops in, split views and other windows glide.
+26. **Apple guidelines review**: commands in the menu bar, Increase Contrast, Reduce Motion everywhere, 20px minimum click targets. Kept on purpose (as in Arc): Cmd+S / Cmd+D / Cmd+1…9 redefined, auto-archive.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 
