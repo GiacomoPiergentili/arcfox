@@ -140,6 +140,8 @@ try {
     // (this file runs before almost anything) could stall it.
     let altPeekAt = 0;
     let altPeekHooked = false;
+    // (the profile's user.js is checked once a launch, see below)
+    let verticalTabsKept = false;
     const hookAltPeek = () => {
       if (altPeekHooked) {
         return;
@@ -304,6 +306,30 @@ try {
             report("profile set-up", e);
           }
         }
+      });
+      // Vertical tabs stay on even without this script or Betterfox's
+      // defaults (a Firefox update can take both out of the app; Firefox's
+      // own default is horizontal tabs): the profile's user.js, which
+      // Firefox applies at every start, turns them on. Checked once a launch.
+      guard("vertical tabs kept on", () => {
+        if (verticalTabsKept) {
+          return;
+        }
+        verticalTabsKept = true;
+        const userJs = win.Services.dirsvc.get("ProfD", Ci.nsIFile);
+        userJs.append("user.js");
+        const lines = ['user_pref("sidebar.revamp", true);', 'user_pref("sidebar.verticalTabs", true);'];
+        win.IOUtils.readUTF8(userJs.path).catch(() => "").then(text => {
+          const missing = lines.filter(line => !text.includes(line));
+          if (missing.length) {
+            const start = text && !text.endsWith("\n") ? "\n" : "";
+            return win.IOUtils.writeUTF8(userJs.path, text + start +
+              "// arcfox: the Arc sidebar is built on vertical tabs (kept on even if a\n" +
+              "// Firefox update removes arc-shortcut/install.sh's files from the app)\n" +
+              missing.join("\n") + "\n");
+          }
+          return undefined;
+        }).catch(e => report("vertical tabs kept on", e));
       });
       // Reuse the existing Cmd+S key: detach it from "Save Page" and run our
       // toggle instead (without it, just this is missing)

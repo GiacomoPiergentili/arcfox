@@ -550,10 +550,26 @@ check(/^\d{1,3}, \d{1,3}, \d{1,3}$/.test(saved), "arc.sidebarColor." + scheme + 
 check(root.style.getPropertyValue("--arc-sidebar-" + scheme) === "rgb(" + saved + ")", "the window uses it");
 return result({scheme, saved});
 """),
+
+    ("vertical tabs kept on: the profile's user.js (1/2)", r"""
+// (the next launch puts them back, see after the restart)
+const path = PathUtils.join(PathUtils.profileDir, "user.js");
+const text = await IOUtils.readUTF8(path);
+check(/user_pref\("sidebar\.verticalTabs", true\);/.test(text), "a profile's user.js turns vertical tabs on");
+await IOUtils.writeUTF8(path, text.split("\n").filter(l => !/"sidebar\.(verticalTabs|revamp)"/.test(l)).join("\n"));
+return result({});
+"""),
 ]
 
 # After a restart (same profile)
 AFTER_RESTART = [
+    ("vertical tabs kept on: the profile's user.js (2/2)", r"""
+await wait(500);
+const text = await IOUtils.readUTF8(PathUtils.join(PathUtils.profileDir, "user.js"));
+check(text.includes('user_pref("sidebar.verticalTabs", true);') && text.includes('user_pref("sidebar.revamp", true);'), "taken out, they're back after a launch");
+check(text.includes('"marionette.port"'), "the rest of user.js is kept");
+return result({});
+"""),
     ("restart: rows and folder come back, launch starts on the empty page", r"""
 await wait(1500);
 const names = rows().map(t => t.label);

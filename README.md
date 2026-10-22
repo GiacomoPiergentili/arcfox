@@ -115,7 +115,21 @@ The commands above are also in the menu bar, with their shortcuts: Window → Pi
    It also installs [Betterfox](https://github.com/yokoffing/Betterfox) (`betterfox/user.js`, plus arcfox's `betterfox/overrides.js`: vertical tabs on, which the layout needs, and Firefox's own password saving off for iCloud Passwords) as Firefox's default prefs, `defaults/pref/betterfox.js`, so every profile, new or old, gets it with nothing to copy. Unlike a `user.js`, what you change in `about:config` keeps your value. `betterfox/update.sh` fetches the latest Betterfox; review the diff and run `install.sh` again.
 4. Quit Firefox (Cmd+Q) and reopen it.
 
-**After every Firefox update, run `install.sh` again**: updates replace the app, including the files the script lives in (the CSS keeps working without it, the behavior doesn't). When the script isn't running, a notice at the bottom of the sidebar says so.
+**After every Firefox update, run `install.sh` again**: updates replace the app, including the files the script lives in (the CSS keeps working without it, the behavior doesn't). When the script isn't running, a notice at the bottom of the sidebar says so. Vertical tabs stay on meanwhile: the script also puts them in each profile's `user.js`, which doesn't depend on the app.
+
+### Automatic updates (optional)
+
+```bash
+~/Developer/arcfox/autoupdate/setup.sh            # on
+~/Developer/arcfox/autoupdate/setup.sh uninstall  # off
+```
+
+A LaunchAgent runs `autoupdate/check.sh` at login, when Firefox.app changes and every 6 hours:
+
+- **After a Firefox update** took the script out of the app, it runs `install.sh` (in Terminal, which needs App Management) and a notification asks you to restart Firefox. Editing the repo never triggers a reinstall: run `install.sh` yourself when your changes are ready.
+- **Once a day** it fetches Betterfox; if it changed and holds only `user_pref` lines, it updates `betterfox/user.js` (left uncommitted: `git diff betterfox/` shows what changed) and reinstalls only Betterfox's defaults (`install.sh betterfox`). Anything else in the file is refused and logged.
+
+Log: `~/Library/Logs/arcfox-autoupdate.log`.
 
 To remove the script: `install.sh uninstall`, then restart. To remove the look: delete or rename `userChrome.css` (or the `chrome` link).
 
@@ -126,6 +140,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | `userChrome.css` | All styling. Design tokens at the top; sections for the sidebar, tabs, tiles, rows/folders, URL bar, menus and panels, auto-hide, motion, fullscreen. |
 | `arc-shortcut/src/*.js` | The script, one file per feature (`01-start.js` opens the per-window set-up, `18-…` lists every replacement of Firefox's code and closes it). The installer joins them in order and appends them to `Firefox.app/Contents/Resources/firefox.cfg`. Runs once per browser window; each feature sets itself up on its own, so one broken by a Firefox update leaves the rest working (the browser console names it: "Arc sidebar (…): not set up"). |
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `firefox.cfg`, the pref file below and Betterfox's defaults. |
+| `autoupdate/` | The optional automatic updates: `check.sh` (what the LaunchAgent runs), `setup.sh` (turns it on or off). |
 | `betterfox/` | Betterfox's `user.js` (unchanged), `overrides.js` (arcfox's additions) and `update.sh`. The installer turns them into Firefox's default prefs. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Has Firefox run `firefox.cfg` at startup, outside the autoconfig sandbox (so the script can reach browser windows). |
 
@@ -182,4 +197,4 @@ Plans and known gaps: see [TODO.md](TODO.md).
 ## License
 
 [MIT](LICENSE): free to use, change and share, with the copyright notice kept.
-29. **From LibreWolf to Firefox**: the repo moved to arcfox, on Firefox 158 with Betterfox (Apple's iCloud Passwords and passkeys can't reach LibreWolf). A Firefox installer (it adds the autoconfig pref file and `firefox.cfg`), Downloads kept visible (Firefox hides it until there's a download), and a new profile gets back, forward, reload and Downloads on its toolbar (Firefox 158 leaves reload and Downloads out with vertical tabs). The test suite runs on Firefox, on its own or on top of Betterfox. Betterfox is installed with the script, as Firefox's default prefs, so every profile gets it.
+29. **From LibreWolf to Firefox**: the repo moved to arcfox, on Firefox 158 with Betterfox (Apple's iCloud Passwords and passkeys can't reach LibreWolf). A Firefox installer (it adds the autoconfig pref file and `firefox.cfg`), Downloads kept visible (Firefox hides it until there's a download), and a new profile gets back, forward, reload and Downloads on its toolbar (Firefox 158 leaves reload and Downloads out with vertical tabs). The test suite runs on Firefox, on its own or on top of Betterfox. Betterfox is installed with the script, as Firefox's default prefs, so every profile gets it. Vertical tabs are kept on in each profile's `user.js`, and optional automatic updates reinstall after Firefox updates and pull in Betterfox's.
