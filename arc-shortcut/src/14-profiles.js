@@ -102,7 +102,8 @@
             win.Services.obs.removeObserver(profilesObserver, "sps-profiles-updated");
             profileService.off?.("enableChanged", onEnable);
           }, { once: true });
-          refreshProfiles();
+          // (drawn before the window's contents fade in)
+          startupWaits.push(refreshProfiles());
           // (and once LibreWolf has settled, in case it was still busy)
           SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(refreshProfiles, 1000));
         }

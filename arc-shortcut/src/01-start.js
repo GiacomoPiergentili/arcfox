@@ -170,6 +170,9 @@ try {
       // one (a renamed element or function), only that feature is missing,
       // and the browser console says which. (Its helpers are plain
       // definitions, which can't fail, so they stay outside.)
+      // What the start-up fade waits for besides the tabs and their icons
+      // (promises; half a second at most, see the end)
+      const startupWaits = [];
       const guard = (name, setUp) => {
         try {
           return setUp();

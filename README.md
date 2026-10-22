@@ -25,7 +25,7 @@ Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark a
 - Bottom row: Downloads at the left, the profile switcher in the middle, Extensions at the right (bookmarks and history are in the menu bar). No ☰ menu (everything in it is in the macOS menu bar) and no "Customize sidebar" gear.
 - **Auto-hide mode**: the sidebar slides in over the page when the pointer reaches the window's left edge (Apple-style curves); the URL bar then floats in the middle of the window, Spotlight-style. Its color is measured from the pinned sidebar, so it matches with any theme or wallpaper.
 - Fullscreen: the sidebar and toolbar keep working when the macOS menu bar slides in.
-- Start-up: the tab list appears complete (tiles, rows, folders, icons) with a short fade, instead of popping in piece by piece; the command bar appears straight in the middle (never in the sidebar first).
+- Start-up: everything appears at once, in one short fade: the toolbar buttons, tiles, rows, folders, their icons, the bottom row with the profiles, and the command bar in the middle (it waits for the icons and profiles, half a second at most). The page area has the empty page's color from the first frame.
 
 ### Profiles (Arc's Spaces)
 - LibreWolf profiles serve as Spaces: each has its own tiles, rows, folders, logins, history and extensions, and its own theme.
@@ -169,6 +169,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 25. **More motion**: tile colors fade, the away dot pops in, split views and other windows glide.
 26. **Apple guidelines review**: commands in the menu bar, Increase Contrast, Reduce Motion everywhere, 20px minimum click targets. Kept on purpose (as in Arc): Cmd+S / Cmd+D / Cmd+1…9 redefined, auto-archive.
 27. **Refactor**: features set up independently, LibreWolf's replaced code in one checked list, shared motion helpers, the script split into one file per feature.
+28. **Start-up in one go**: recorded at 60 fps: toolbar buttons, the sidebar button, the list and icons, the avatars and the command bar each appeared on their own, and the page area changed shade. Now one fade, once everything's ready.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

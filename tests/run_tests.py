@@ -552,6 +552,7 @@ check(gBrowser.selectedTab.hasAttribute("arc-start-page"), "launch starts on the
 check(rows().every(r => r.hasAttribute("pending")), "rows come back unloaded");
 check(tiles().every(t => t.hasAttribute("pending")), "tiles come back unloaded too (they load when opened)");
 check(!root.hasAttribute("arc-starting") && getComputedStyle(gBrowser.tabContainer).opacity === "1", "the tab list is shown once start-up is done");
+check(["nav-bar-customization-target", "arc-sidebar-button"].every(id => getComputedStyle(document.getElementById(id)).opacity === "1"), "...and with it the toolbar, the bottom row and the sidebar button");
 newTabKey(); await wait(300);
 return result({rows: names});
 """),

@@ -1884,29 +1884,24 @@ split-view-footer {
 }
 
 /* ---------- Start-up ----------
-   While a window starts, its tab list (and URL bar) is hidden ([arc-starting], set by the
-   shortcut script before the window is shown) until its tiles, rows,
-   folders and start page are in place; then it fades in. Without the
-   script nothing is hidden. */
-#tabbrowser-tabs {
-  transition: opacity 150ms ease-out;
+   While a window starts ([arc-starting], set by the shortcut script before
+   the window is shown), the sidebar's contents and the command bar are
+   hidden: the toolbar's buttons and URL field (the command bar and the
+   bottom row are in there too), the sidebar button and the tiles, rows
+   and folders. Once they're all in place (the tabs back, their icons
+   loaded, the profiles drawn: half a second at most) the script fades them
+   in together, in one go. The window buttons are the system's and stay.
+   Without the script nothing is hidden. */
+:root[arc-starting] :is(#nav-bar-customization-target, #arc-sidebar-button, #tabbrowser-tabs),
+:root[arc-starting] #nav-bar::after {
+  opacity: 0 !important;
 }
 
-:root[arc-starting] #tabbrowser-tabs {
-  opacity: 0;
-  transition: none;
-}
-
-/* ...and so is the URL bar in the sidebar (LibreWolf focuses it for the
-   empty start page): on a start page it first appears floating in the
-   middle ([arc-newtab-bar]), never in the sidebar first */
-#urlbar-container {
-  transition: opacity 150ms ease-out;
-}
-
-:root[arc-starting]:not([arc-newtab-bar]) #urlbar-container {
-  opacity: 0;
-  transition: none;
+/* A page's area has the empty page's own color from the start (LibreWolf
+   paints it gray until the first page is drawn, a change of shade at
+   launch); a page draws its own over it */
+#tabbrowser-tabpanels .browserContainer {
+  background-color: light-dark(#ffffff, #1c1b22) !important;
 }
 
 /* No bookmarks toolbar: there's no room for it in the sidebar (bookmarks

@@ -32,14 +32,46 @@
       patch("command bar: the address waits", win.gURLBar, "setURI", commandBar.holdAddress);
       patch("command bar: Enter opens a tab", win.gURLBar?.controller, "whereToOpen", commandBar.enterOpensTab);
 
-      // Everything's in place (rows and folders restored or synced, the
-      // start page marked: those run on the same signal, earlier): the tab
-      // list fades in (see "browser-window-before-show" above)
-      // (without it, the 4s fallback above shows the list)
+      // Everything's in place (rows and folders restored or synced and the
+      // start page marked, which run on the same signal, earlier; every
+      // icon shown loaded and the profiles drawn, for half a second at
+      // most): the sidebar's contents and the command bar fade in together,
+      // in one go (see "browser-window-before-show" at the top; without
+      // this, its 4s fallback shows them)
       guard("start-up fade", () => {
-        SessionStore.promiseAllWindowsRestored.then(() => win.setTimeout(() => {
-          win.requestAnimationFrame(() => win.requestAnimationFrame(() => doc.documentElement.removeAttribute("arc-starting")));
-        }, 0));
+        const root = doc.documentElement;
+        const iconsLoaded = () => Promise.allSettled(
+          [...gBrowser.tabContainer.querySelectorAll(".tab-icon-image[src]")]
+            .filter(img => !img.complete && img.getBoundingClientRect().width > 0)
+            .map(img => img.decode()));
+        const fadeIn = () => {
+          if (!root.hasAttribute("arc-starting")) {
+            return;
+          }
+          // (the attribute goes in the same frame the fade starts: the first
+          // frame drawn is its start)
+          root.removeAttribute("arc-starting");
+          if (reducedMotion()) {
+            return;
+          }
+          const parts = [
+            [doc.getElementById("nav-bar-customization-target")],
+            [doc.getElementById("arc-sidebar-button")],
+            [gBrowser.tabContainer],
+            [doc.getElementById("nav-bar"), "::after"],
+          ];
+          for (const [el, pseudoElement] of parts) {
+            el?.animate({ opacity: [0, 1] }, { duration: 250, easing: "ease-out", pseudoElement });
+          }
+        };
+        SessionStore.promiseAllWindowsRestored.then(async () => {
+          await new Promise(done => win.setTimeout(done, 0));
+          await Promise.race([
+            Promise.allSettled([iconsLoaded(), ...startupWaits]),
+            new Promise(done => win.setTimeout(done, 500)),
+          ]);
+          win.requestAnimationFrame(() => win.requestAnimationFrame(fadeIn));
+        });
       });
     }, "browser-delayed-startup-finished");
   })();
