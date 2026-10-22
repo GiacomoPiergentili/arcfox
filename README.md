@@ -13,7 +13,7 @@ LibreWolf's native vertical tabs become an Arc sidebar: the toolbar and URL bar 
 It's two pieces:
 
 - **`userChrome.css`**: the whole look (layout, sizes, colors, motion).
-- **`arc-shortcut/shortcut.cfg.js`**: the behavior (pinned rows and folders, the command bar, closing rules, tile colors, ...). It runs as a LibreWolf *autoconfig* script, installed into the app by `arc-shortcut/install.sh`.
+- **`arc-shortcut/src/`**: the behavior (pinned rows and folders, the command bar, closing rules, tile colors, ...), one file per feature. It runs as a LibreWolf *autoconfig* script: `arc-shortcut/install.sh` joins the files in order into the app's `librewolf.cfg`.
 
 Built and tested on **LibreWolf 158** (macOS) with the Nova Ash theme, in dark and light mode.
 
@@ -119,7 +119,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | File | What it is |
 |---|---|
 | `userChrome.css` | All styling. Design tokens at the top; sections for the sidebar, tabs, tiles, rows/folders, URL bar, menus and panels, auto-hide, motion, fullscreen. |
-| `arc-shortcut/shortcut.cfg.js` | The script, appended to `LibreWolf.app/Contents/Resources/librewolf.cfg` by the installer. Runs once per browser window. |
+| `arc-shortcut/src/*.js` | The script, one file per feature (`01-start.js` opens the per-window set-up, `18-…` lists every replacement of LibreWolf's code and closes it). The installer joins them in order and appends them to `LibreWolf.app/Contents/Resources/librewolf.cfg`. Runs once per browser window; each feature sets itself up on its own, so one broken by a LibreWolf update leaves the rest working (the browser console names it: "Arc sidebar (…): not set up"). |
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `librewolf.cfg` and the pref file below. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Disables the autoconfig sandbox so the script can reach browser windows. |
 
@@ -168,6 +168,7 @@ Built over October 20–21, 2026, from a plain LibreWolf with vertical tabs:
 24. **Motion**: tabs slide open and shut; pinning and unpinning glide everything to its new place; closing a pinned row or tile settles it back in place.
 25. **More motion**: tile colors fade, the away dot pops in, split views and other windows glide.
 26. **Apple guidelines review**: commands in the menu bar, Increase Contrast, Reduce Motion everywhere, 20px minimum click targets. Kept on purpose (as in Arc): Cmd+S / Cmd+D / Cmd+1…9 redefined, auto-archive.
+27. **Refactor**: features set up independently, LibreWolf's replaced code in one checked list, shared motion helpers, the script split into one file per feature.
 
 Plans and known gaps: see [TODO.md](TODO.md).
 

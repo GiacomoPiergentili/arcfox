@@ -185,8 +185,10 @@ check(gURLBar.value === "", "the bar starts empty");
 check(gBrowser.tabs.length === count, "Cmd+T creates no tab");
 check(getComputedStyle(document.getElementById("tabs-newtab-button")).backgroundColor !== "rgba(0, 0, 0, 0)", "+ New Tab is highlighted");
 gURLBar.inputField.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
-await new Promise(k => requestAnimationFrame(k)); await new Promise(k => requestAnimationFrame(k));
-check(root.hasAttribute("arc-newtab-fading") && Number(getComputedStyle(document.getElementById("urlbar")).opacity) < 1, "it fades out where it is");
+// (its curve starts slowly: look over a few frames)
+const fade = [];
+for (let i = 0; i < 6; i++) { await new Promise(k => requestAnimationFrame(k)); fade.push(root.hasAttribute("arc-newtab-fading") ? Number(getComputedStyle(document.getElementById("urlbar")).opacity) : -1); }
+check(fade.some(o => o > 0 && o < 0.95), "it fades out where it is: " + fade.map(o => o.toFixed(2)).join(","));
 await wait(400);
 check(!barOpen() && !root.hasAttribute("arc-newtab-fading"), "Esc closes it");
 check(gURLBar.value !== "", "Esc shows the page's address again");

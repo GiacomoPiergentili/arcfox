@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Installs (or removes) the Arc sidebar script (shortcut.cfg.js) into LibreWolf.app.
+# Installs (or removes) the Arc sidebar script (src/*.js, joined in order) into LibreWolf.app.
 # Rerun after every LibreWolf update, since updates replace the app.
 #   ./install.sh            install
 #   ./install.sh uninstall  remove
@@ -25,5 +25,5 @@ mkdir -p "$PREFDIR"
 cp "$HERE/arc-shortcut-prefs.js" "$PREFDIR/arc-shortcut-prefs.js"
 printf '\n' >> "$CFG"
 # (the repo's folder, for profiles that don't have the look yet)
-sed "s|__ARC_CHROME_DIR__|${HERE:h}|" "$HERE/shortcut.cfg.js" >> "$CFG"
+cat "$HERE"/src/*.js | sed "s|__ARC_CHROME_DIR__|${HERE:h}|" >> "$CFG"
 echo "Installed. Quit LibreWolf (Cmd+Q) and reopen it."
