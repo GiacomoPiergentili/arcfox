@@ -131,6 +131,11 @@ A LaunchAgent runs `autoupdate/check.sh` at login, when Firefox.app changes and 
 
 Log: `~/Library/Logs/arcfox-autoupdate.log`.
 
+**Something not working?** Run the doctor: it checks every piece (the script, its pref file and Betterfox's defaults in Firefox.app against the repo, whether Firefox needs a restart, each profile's `chrome` link and `user.js`, the automatic updates, iCloud Passwords) and says how to fix what isn't right. It only reads; it can check profiles only from a Terminal with Full Disk Access, since macOS keeps other apps out of Firefox's folder.
+```bash
+~/Developer/arcfox/doctor.sh
+```
+
 To remove the script: `install.sh uninstall`, then restart. To remove the look: delete or rename `userChrome.css` (or the `chrome` link).
 
 ## How it works
@@ -140,6 +145,7 @@ To remove the script: `install.sh uninstall`, then restart. To remove the look: 
 | `userChrome.css` | All styling. Design tokens at the top; sections for the sidebar, tabs, tiles, rows/folders, URL bar, menus and panels, auto-hide, motion, fullscreen. |
 | `arc-shortcut/src/*.js` | The script, one file per feature (`01-start.js` opens the per-window set-up, `18-…` lists every replacement of Firefox's code and closes it). The installer joins them in order and appends them to `Firefox.app/Contents/Resources/firefox.cfg`. Runs once per browser window; each feature sets itself up on its own, so one broken by a Firefox update leaves the rest working (the browser console names it: "Arc sidebar (…): not set up"). |
 | `arc-shortcut/install.sh` | Installs / updates / removes the script block in the app's `firefox.cfg`, the pref file below and Betterfox's defaults. |
+| `doctor.sh` | Checks the whole setup and says how to fix what isn't right (reads only). |
 | `autoupdate/` | The optional automatic updates: `check.sh` (what the LaunchAgent runs), `setup.sh` (turns it on or off). |
 | `betterfox/` | Betterfox's `user.js` (unchanged), `overrides.js` (arcfox's additions) and `update.sh`. The installer turns them into Firefox's default prefs. |
 | `arc-shortcut/arc-shortcut-prefs.js` | Has Firefox run `firefox.cfg` at startup, outside the autoconfig sandbox (so the script can reach browser windows). |

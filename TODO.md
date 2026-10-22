@@ -35,6 +35,7 @@ Nothing queued.
 
 ## Done
 
+- [x] `doctor.sh`: checks the whole setup in one go (installed files against the repo, restart needed, profiles' chrome link and user.js, automatic updates, iCloud Passwords, uncommitted Betterfox updates) and says how to fix each problem.
 - [x] Tests for empty and unusual states: a brand-new profile's first run and restart, nothing pinned, tiles only, rows only, a scrambled toolbar. Fixed along the way: the divider sat 12px too low with no rows (and was clipped away with tiles only); with nothing pinned there's no divider now.
 - [x] Fixed: with no tiles, dragging a tab to the top never made the first tile (Firefox's pin drop zone opened below the dragged tab, late, and a release above it, where the pointer ends up, landed on the toolbar). The zone is now an empty Arc tile slot that opens at once, and a release just above it counts. Fixed: a profile's saved toolbar could show reload, forward, back; they're put back in order.
 - [x] Moved from LibreWolf to Firefox 158 + Betterfox: Firefox installer, Downloads kept visible, toolbar buttons placed on a new profile's first run, tests on Firefox (also on top of Betterfox's `user.js`). Betterfox ships in `betterfox/` and `install.sh` installs it as Firefox's default prefs, for every profile. Vertical tabs kept on in each profile's `user.js`; optional automatic updates (`autoupdate/`).
