@@ -31,6 +31,10 @@ APP = "/Applications/Firefox.app/Contents/MacOS/firefox"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 2839  # its own port, so it never talks to another Firefox
 
+# (what a profile needs for the look; the script turns them on itself in a
+# new profile)
+LOOK_PREFS = ("toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs")
+
 PREFS = {
     "marionette.port": PORT,
     "toolkit.legacyUserProfileCustomizations.stylesheets": True,
@@ -689,18 +693,107 @@ return result({});
 ]
 
 
+# A brand-new profile without the look (as made from Firefox's Profiles
+# menu): no chrome folder, nothing pinned. Its first run...
+FIRST_RUN = [
+    ("new profile: linked to this repo on its first run", r"""
+await wait(2500);
+const chrome = Services.dirsvc.get("UChrm", Ci.nsIFile);
+check(chrome.exists() && chrome.isSymlink(), "its chrome folder is now a link");
+check(chrome.isSymlink() && chrome.target === "__REPO_PLACEHOLDER__", "...to this repo: " + (chrome.isSymlink() ? chrome.target : ""));
+for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+  check(Services.prefs.getBoolPref(name, false), name + " is on");
+}
+check(Services.prefs.getBoolPref("arc.profileDefaultsApplied", false), "the layout's settings are applied");
+check(!!gNotificationBox.getNotificationWithValue("arc-restart"), "a bar offers to restart");
+const text = await IOUtils.readUTF8(PathUtils.join(PathUtils.profileDir, "user.js"));
+check(text.includes('user_pref("sidebar.verticalTabs", true);'), "its user.js keeps vertical tabs on");
+const notSetUp = Services.console.getMessageArray().map(m => m.message || "").filter(m => /^Arc sidebar \(/.test(m));
+check(!notSetUp.length, "no errors: " + notSetUp.map(m => m.split("\n")[0]).join(" | "));
+return result({});
+"""),
+]
+
+# ...and after the restart it offered, the same profile: empty states
+EMPTY = [
+    ("new profile, restarted: the look, nothing pinned", r"""
+await wait(1500);
+check(!!getComputedStyle(root).getPropertyValue("--arc-tab-height"), "userChrome.css loaded");
+check(root.hasAttribute("arc-script"), "the script runs");
+check(!tiles().length && !rows().length, "no tiles or rows");
+check(gBrowser.tabs.length === 1 && gBrowser.selectedTab.hasAttribute("arc-start-page"), "just the empty page: " + gBrowser.tabs.map(t => t.label).join(", "));
+check(barOpen(), "with the command bar open");
+const per = document.getElementById("tabbrowser-arrowscrollbox-periphery");
+check(getComputedStyle(per, "::before").display === "none", "no divider: nothing to divide");
+return result({});
+"""),
+
+    ("nothing pinned: one tab, its place, Cmd+W", r"""
+const t = gBrowser.addTab(page("Only", "#36e"), {triggeringPrincipal: P});
+gBrowser.selectedTab = t; await wait(1200);
+check(!barOpen(), "the command bar closed");
+const per = document.getElementById("tabbrowser-arrowscrollbox-periphery");
+check(getComputedStyle(per, "::before").display === "none", "still no divider");
+const url = R(document.getElementById("urlbar-container")), nt = R(document.getElementById("tabs-newtab-button"));
+check(near(nt.y - url.b, 16, 1), "+ New Tab 16px under the URL bar, as tiles would be: " + (nt.y - url.b));
+document.getElementById("key_close").doCommand(); await wait(1500);
+check(!window.closed && gBrowser.tabs.length === 1 && gBrowser.selectedTab.hasAttribute("arc-start-page"), "Cmd+W on the only tab leaves the empty page (the window stays): " + gBrowser.tabs.map(x => x.label).join(", "));
+check(barOpen(), "...with the command bar");
+document.getElementById("key_close").doCommand(); await wait(1000);
+check(!window.closed && gBrowser.tabs.length === 1 && gBrowser.selectedTab.hasAttribute("arc-start-page"), "Cmd+W on the empty page does nothing");
+return result({});
+"""),
+
+    ("tiles only: the divider 8px under them, 9px above + New Tab", r"""
+const made = [page("Red", "#e33"), page("Green", "#2a5")].map(u => gBrowser.addTab(u, {triggeringPrincipal: P}));
+for (const t of made) gBrowser.pinTab(t);
+gBrowser.selectedTab = made[0]; await wait(1200);
+const per = document.getElementById("tabbrowser-arrowscrollbox-periphery");
+const sp = document.getElementById("vertical-pinned-tabs-splitter");
+check(getComputedStyle(per, "::before").display === "none" && /gradient/.test(getComputedStyle(sp).backgroundImage), "the line is drawn by the splitter (the list's top would clip it)");
+const lineY = R(sp).y + 3;
+const tilesBottom = Math.max(...tiles().map(x => bg(x).b));
+check(near(lineY - tilesBottom, 8), "8px under the tiles: " + (lineY - tilesBottom));
+check(near(R(document.getElementById("tabs-newtab-button")).y - lineY, 9), "9px above + New Tab: " + (R(document.getElementById("tabs-newtab-button")).y - lineY));
+// (a tab to stay on first: removing a window's last tab closes the window)
+gBrowser.selectedTab = gBrowser.addTab(page("Next", "#999"), {triggeringPrincipal: P}); await wait(300);
+for (const t of made) { gBrowser.unpinTab(t); }
+await wait(300);
+for (const t of made) gBrowser.removeTab(t, {animate: false});
+await wait(800);
+return result({});
+"""),
+
+    ("rows only: the divider 8px under them, 9px above + New Tab", r"""
+const made = [page("Row A", "#e33"), page("Row B", "#2a5")].map(u => gBrowser.addTab(u, {triggeringPrincipal: P}));
+const key = document.getElementById("addBookmarkAsKb");
+for (const t of made) { gBrowser.selectedTab = t; await wait(350); key.doCommand(); await wait(450); }
+await wait(800);
+check(rows().length === 2 && !tiles().length, "two rows, no tiles");
+const per = document.getElementById("tabbrowser-arrowscrollbox-periphery");
+check(getComputedStyle(per, "::before").display !== "none", "the divider's own line");
+const lineY = R(per).y - 9;
+const rowsBottom = Math.max(...rows().map(x => bg(x).b));
+check(near(lineY - rowsBottom, 8), "8px under the rows: " + (lineY - rowsBottom));
+check(near(R(document.getElementById("tabs-newtab-button")).y - lineY, 9), "9px above + New Tab: " + (R(document.getElementById("tabs-newtab-button")).y - lineY));
+return result({});
+"""),
+]
+
+
 # ---------------------------------------------------------------- runner
-def write_prefs(profile):
+def write_prefs(profile, prefs=None):
+    prefs = PREFS if prefs is None else prefs
     with open(os.path.join(profile, "user.js"), "w") as f:
         # (the tests' own prefs come after, so they win)
         if "--user-js" in sys.argv:
             with open(sys.argv[sys.argv.index("--user-js") + 1]) as base:
                 f.write(base.read() + "\n")
-        for key, value in PREFS.items():
+        for key, value in prefs.items():
             f.write("user_pref(%s, %s);\n" % (json.dumps(key), json.dumps(value)))
 
 
-def launch(profile, attempt=1):
+def launch(profile, attempt=1, needs_look=True):
     log = open(os.path.join(profile, "firefox.log"), "w")
     proc = subprocess.Popen([APP, "-profile", profile, "-no-remote", "--marionette",
                              "--remote-allow-system-access", "about:blank"],
@@ -717,7 +810,7 @@ def launch(profile, attempt=1):
     # Firefox start-up quirk, not ours): start it again rather than test
     # without the look
     loaded = mn.js("return !!getComputedStyle(root).getPropertyValue('--arc-tab-height');")
-    if not loaded and attempt < 3:
+    if needs_look and not loaded and attempt < 3:
         print("(userChrome.css didn't load in the test browser; starting it again)")
         quit(proc, mn)
         return launch(profile, attempt + 1)
@@ -761,6 +854,7 @@ def main():
     os.symlink(REPO, os.path.join(profile, "chrome"))
     write_prefs(profile)
     print("Test profile:", profile)
+    profiles = [profile]
     results = []
     try:
         proc, mn = launch(profile)
@@ -770,9 +864,22 @@ def main():
             proc, mn = launch(profile)
             run(mn, AFTER_RESTART, results)
             quit(proc, mn)
+        if go_on:
+            # a brand-new profile without the look (no chrome folder, nor the
+            # settings that load it): its first run, then empty states
+            fresh = tempfile.mkdtemp(prefix="arcfox-test-new-")
+            profiles.append(fresh)
+            write_prefs(fresh, {k: v for k, v in PREFS.items() if k not in LOOK_PREFS})
+            proc, mn = launch(fresh, needs_look=False)
+            run(mn, [(n, b.replace("__REPO_PLACEHOLDER__", REPO)) for n, b in FIRST_RUN], results)
+            quit(proc, mn)
+            proc, mn = launch(fresh)
+            run(mn, EMPTY, results)
+            quit(proc, mn)
     finally:
         if "--keep" not in sys.argv:
-            shutil.rmtree(profile, ignore_errors=True)
+            for p in profiles:
+                shutil.rmtree(p, ignore_errors=True)
     failed = [n for n, ok in results if not ok]
     print("\n%d passed, %d failed" % (len(results) - len(failed), len(failed)))
     sys.exit(1 if failed else 0)

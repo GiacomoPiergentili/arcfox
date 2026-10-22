@@ -430,6 +430,41 @@ sidebar-main {
   }
 }
 
+/* No rows: nothing for the line to measure from above, so it measures from
+   the tiles (8px, the line, 8px from their edge; under them come their half
+   gap, a 1px margin and Firefox's 9px splitter). With nothing pinned at all
+   there's nothing to divide: no line, and + New Tab sits 16px under the URL
+   bar, as the tiles would (the tab list starts 12px under it). The line still
+   shows as the cue while a drag would make the first row ([arc-drop-row]). */
+#tabbrowser-tabs[orient="vertical"]:not(:has(:is(.tabbrowser-tab[arc-pinned-row], tab-group))) #tabbrowser-arrowscrollbox-periphery {
+  margin-top: calc(17px - var(--arc-tile-gap) / 2 - 1px - 9px) !important;
+}
+
+/* (tiles only: that line would sit above the tab list's top edge, which
+   clips it; Firefox's 4px splitter under the tiles, the line's exact width,
+   draws it instead, 3px down: 8px under the tiles) */
+#tabbrowser-tabs[orient="vertical"]:has(.tabbrowser-tab[pinned]):not(:has(:is(.tabbrowser-tab[arc-pinned-row], tab-group))) {
+  > #vertical-pinned-tabs-splitter {
+    background: linear-gradient(var(--arc-hairline), var(--arc-hairline)) no-repeat 0 3px / 100% 1px !important;
+
+    :root[arc-drop-row] & {
+      background-image: linear-gradient(AccentColor, AccentColor) !important;
+    }
+  }
+
+  #tabbrowser-arrowscrollbox-periphery::before {
+    display: none;
+  }
+}
+
+#tabbrowser-tabs[orient="vertical"]:not(:has(:is(.tabbrowser-tab[arc-pinned-row], .tabbrowser-tab[pinned], tab-group))) #tabbrowser-arrowscrollbox-periphery {
+  margin-top: calc(16px - 12px) !important;
+
+  :root:not([arc-drop-row]) &::before {
+    display: none;
+  }
+}
+
 /* eased while dragging; on drop it snaps, as the tabs land in place */
 :root[arc-dragging] #tabbrowser-tabs[orient="vertical"] #tabbrowser-arrowscrollbox-periphery {
   transition: translate calc(var(--arc-drag-duration) * 4 / 3) ease !important;
