@@ -392,6 +392,19 @@ sidebar-main {
   }
 }
 
+/* A tab gliding to a new place (pinned or unpinned, see the script) passes
+   over other rows: it's drawn above them, on the sidebar's own color (as
+   measured by the script), so the two don't show through each other */
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[arc-gliding] {
+  position: relative;
+  z-index: 2;
+
+  > .tab-stack {
+    background-color: light-dark(var(--arc-sidebar-light, transparent), var(--arc-sidebar-dark, transparent));
+    border-radius: var(--arc-radius-inner);
+  }
+}
+
 /* LibreWolf's end-of-list box, which holds + New Tab, sits right under the
    pinned block, the divider in the 16px gap above it, so the line always
    moves with the button. While dragging, LibreWolf would shift the box as if
