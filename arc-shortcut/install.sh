@@ -5,6 +5,8 @@
 #   ./install.sh uninstall  remove
 # Firefox runs an autoconfig file only when a pref file in defaults/pref names
 # it: arc-shortcut-prefs.js does (firefox.cfg) and turns off its sandbox.
+# Betterfox (betterfox/user.js and overrides.js) goes in as Firefox's default
+# prefs, for every profile: betterfox.js.
 set -e
 
 HERE="${0:A:h}"
@@ -27,7 +29,7 @@ if [[ -f "$CFG" ]]; then
 fi
 
 if [[ "$1" == "uninstall" ]]; then
-  rm -f "$PREFDIR/arc-shortcut-prefs.js"
+  rm -f "$PREFDIR/arc-shortcut-prefs.js" "$PREFDIR/betterfox.js"
   # (the cfg file too, when nothing but its header is left)
   if [[ -f "$CFG" ]] && [[ -z "$(grep -v -x -F -e "$HEADER" -e '' "$CFG")" ]]; then
     rm -f "$CFG"
@@ -45,6 +47,8 @@ fi
 
 mkdir -p "$PREFDIR"
 cp "$HERE/arc-shortcut-prefs.js" "$PREFDIR/arc-shortcut-prefs.js"
+# (user_pref -> pref: a default, which about:config changes override)
+cat "${HERE:h}/betterfox/user.js" "${HERE:h}/betterfox/overrides.js" | sed 's/^user_pref(/pref(/' > "$PREFDIR/betterfox.js"
 if [[ ! -s "$CFG" ]]; then
   printf '%s\n' "$HEADER" > "$CFG"
 fi
