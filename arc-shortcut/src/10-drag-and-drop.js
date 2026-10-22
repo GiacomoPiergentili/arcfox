@@ -242,8 +242,9 @@
             tileBefore = cells()[tileSlot(e.clientX, y)]?.tile ?? null;
           }
           // Mark it right away, as the cue showed (rows sort above + New Tab, so
-          // a late mark would make it jump); finishDrop double-checks
-          const toRow = headsForRow(y);
+          // a late mark would make it jump); finishDrop double-checks. (On the
+          // first tile's slot it becomes a tile, see below.)
+          const toRow = !onFirstTileSlot(e) && headsForRow(y);
           for (const tab of moving) {
             if (!tab.pinned && isRow(tab) !== toRow) {
               setRow(tab, toRow);
@@ -252,6 +253,85 @@
           const drop = { moving, y, limit, toRow, wasTile: moving.filter(t => t.pinned), tileBefore };
           pendingDrop = drop;
           win.setTimeout(() => finishDrop(drop), 400);
+        }, true);
+      });
+      // The first tile: with no tiles yet, Firefox opens a slot in their place
+      // (#pinned-drop-indicator, an empty tile in userChrome.css) once a tab
+      // is dragged to the top of the list, and pins a tab dropped on it. But
+      // the dragged tab stops at the top of the list, so the pointer ends up
+      // above the slot, over the toolbar or the sidebar's edge around the
+      // list: a drop there makes the tile too. And Firefox can drop the
+      // slot's "ready" mark while the slot pushes the list down: a drop on
+      // the slot always counts.
+      const firstTileSlot = doc.getElementById("pinned-drop-indicator");
+      const slotShown = () => !gBrowser.pinnedTabCount && !!firstTileSlot?.hasAttribute("visible");
+      const onFirstTileSlot = e => {
+        if (!slotShown()) {
+          return false;
+        }
+        const slot = firstTileSlot.getBoundingClientRect();
+        const list = gBrowser.tabContainer.getBoundingClientRect();
+        return e.clientX >= list.left && e.clientX <= list.right && e.clientY <= slot.bottom;
+      };
+      const draggedTabs = e => {
+        const dt = e.dataTransfer;
+        if (dt?.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
+          return null;
+        }
+        const dragged = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+        if (!gBrowser.tabs.includes(dragged) || dragged.pinned) {
+          return null;
+        }
+        return dragged.multiselected ? [...gBrowser.selectedTabs] : [dragged];
+      };
+      guard("drag and drop: the first tile", () => {
+        if (!firstTileSlot) {
+          throw new Error("Firefox's pin drop zone isn't there any more");
+        }
+        // (the list itself is Firefox's: see the last listener)
+        const aboveSlot = e => !gBrowser.tabContainer.contains(e.target) && !!draggedTabs(e) && onFirstTileSlot(e);
+        for (const zone of [doc.getElementById("navigator-toolbox"), doc.getElementById("vertical-tabs")]) {
+          zone?.addEventListener("dragover", e => {
+            if (gBrowser.tabContainer.contains(e.target)) {
+              return;
+            }
+            const over = aboveSlot(e);
+            if (over) {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "move";
+              firstTileSlot.setAttribute("interactive", "");
+              // (the dragged tab takes a tile's shape, as over the tiles)
+              dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - tilesBox().left}px`);
+            }
+            dragRoot.toggleAttribute("arc-drag-over-tiles", over);
+          }, true);
+          zone?.addEventListener("dragleave", e => {
+            if (!zone.contains(e.relatedTarget)) {
+              dragRoot.removeAttribute("arc-drag-over-tiles");
+            }
+          });
+          zone?.addEventListener("drop", e => {
+            if (!aboveSlot(e)) {
+              return;
+            }
+            const tabs = draggedTabs(e);
+            e.preventDefault();
+            e.stopPropagation();
+            const places = notePlaces({ dropping: true });
+            for (const tab of tabs) {
+              setRow(tab, false);
+              gBrowser.pinTab(tab);
+            }
+            glideFrom(places, { nextFrame: true });
+          }, true);
+        }
+        // on the slot: ready, whatever Firefox last thought (its drop handler
+        // reads the mark after this)
+        gBrowser.tabContainer.addEventListener("drop", e => {
+          if (draggedTabs(e) && onFirstTileSlot(e)) {
+            firstTileSlot.setAttribute("interactive", "");
+          }
         }, true);
       });
       // No extra macOS drag preview (the big page thumbnail): the dragged tab
@@ -281,7 +361,8 @@
             return;
           }
           const r = tilesBox();
-          const over = isOverTiles(e.clientY, r);
+          // (the first tile's slot counts as the tiles, see above)
+          const over = isOverTiles(e.clientY, r) || (!!draggedTabs(e) && onFirstTileSlot(e));
           dragRoot.toggleAttribute("arc-drag-over-tiles", over);
           if (over) {
             dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - r.left}px`);
@@ -321,7 +402,7 @@
           }
           // Show while dragging whether the drop makes a pinned row (a folder
           // always stays pinned: no cue)
-          const toRow = !folderSlot && headsForRow(e.clientY);
+          const toRow = !folderSlot && !onFirstTileSlot(e) && headsForRow(e.clientY);
           dragRoot.toggleAttribute("arc-drop-row", toRow);
           // + New Tab follows the rows: as far as Firefox has moved the last
           // one, and a slot down while the dragged tab is headed for them

@@ -35,6 +35,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Fixed: with no tiles, dragging a tab to the top never made the first tile (Firefox's pin drop zone opened below the dragged tab, late, and a release above it, where the pointer ends up, landed on the toolbar). The zone is now an empty Arc tile slot that opens at once, and a release just above it counts. Fixed: a profile's saved toolbar could show reload, forward, back; they're put back in order.
 - [x] Moved from LibreWolf to Firefox 158 + Betterfox: Firefox installer, Downloads kept visible, toolbar buttons placed on a new profile's first run, tests on Firefox (also on top of Betterfox's `user.js`). Betterfox ships in `betterfox/` and `install.sh` installs it as Firefox's default prefs, for every profile. Vertical tabs kept on in each profile's `user.js`; optional automatic updates (`autoupdate/`).
 - [x] New profiles: the settings the layout relies on are applied once on a profile's first run (a new profile showed the bookmarks toolbar in the sidebar, no launch command bar, no Bookmarks button).
 - [x] Spaces, as LibreWolf profiles: a profile switcher in the sidebar's bottom row; profiles made from LibreWolf's menu get the look on their first run.

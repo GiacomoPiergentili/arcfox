@@ -551,6 +551,46 @@ check(root.style.getPropertyValue("--arc-sidebar-" + scheme) === "rgb(" + saved 
 return result({scheme, saved});
 """),
 
+    ("toolbar: back, forward, reload in order", r"""
+const order = w => [...w.document.getElementById("nav-bar-customization-target").children].map(e => e.id).filter(id => /^(back|forward|stop-reload)-button$/.test(id)).join(",");
+const want = "back-button,forward-button,stop-reload-button";
+check(order(window) === want, "in order: " + order(window));
+// a saved toolbar as a real profile had it: reload, forward, back
+CustomizableUI.moveWidgetWithinArea("stop-reload-button", CustomizableUI.getPlacementOfWidget("back-button").position);
+CustomizableUI.moveWidgetWithinArea("back-button", CustomizableUI.getPlacementOfWidget("forward-button").position + 1);
+check(order(window) !== want, "(scrambled for the test)");
+const w2 = OpenBrowserWindow(); await new Promise(k => w2.addEventListener("load", k, {once: true})); await wait(2500);
+check(order(w2) === want && order(window) === want, "a scrambled toolbar is put back in order: " + order(w2));
+w2.close(); await wait(800);
+return result({});
+"""),
+
+    ("first tile: dropped above the empty slot (no tiles yet)", r"""
+const before = tiles();
+for (const t of before) gBrowser.unpinTab(t);
+await wait(800);
+const slot = document.getElementById("pinned-drop-indicator");
+const tab = normals()[0];
+// what Firefox shows when a tab is dragged to the top with no tiles
+slot.setAttribute("visible", ""); await wait(400);
+const list = R(gBrowser.tabContainer), s = R(slot);
+check(near(s.h, 40, 1), "the slot is a tile's height: " + s.h);
+const target = document.elementFromPoint(list.x + 60, s.y - 8);
+check(!gBrowser.tabContainer.contains(target), "just above the slot is outside the tab list (the toolbar or the sidebar's edge): " + target?.id);
+const dt = new DataTransfer(); dt.mozSetDataAt("application/x-moz-tabbrowser-tab", tab, 0);
+const ev = type => { const e = new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: dt, clientX: list.x + 60, clientY: s.y - 8}); target.dispatchEvent(e); return e; };
+check(ev("dragover").defaultPrevented, "a drop there is accepted");
+ev("drop"); await wait(600);
+slot.removeAttribute("visible");
+check(tab.pinned, "...and makes the tab the first tile");
+// back as they were
+gBrowser.unpinTab(tab); await wait(300);
+for (const t of before) gBrowser.pinTab(t);
+await wait(800);
+check(tiles().map(t => t.label).join() === before.map(t => t.label).join(), "(tiles restored)");
+return result({});
+"""),
+
     ("vertical tabs kept on: the profile's user.js (1/2)", r"""
 // (the next launch puts them back, see after the restart)
 const path = PathUtils.join(PathUtils.profileDir, "user.js");

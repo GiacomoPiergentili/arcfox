@@ -43,6 +43,9 @@ try {
       .getService(Ci.nsIPrefService)
       .getDefaultBranch("");
     defaults.setBoolPref("browser.tabs.dragDrop.createGroup.enabled", false);
+    // With no tiles yet, the slot for the first one opens as soon as a tab
+    // is dragged to the top (Firefox waits half a second)
+    defaults.setIntPref("browser.tabs.dragDrop.pinInteractionCue.delayMS", 150);
     // Auto-archive (see below): hours a normal tab may stay unused; 0 = off
     const ARCHIVE_PREF = "arc.archiveAfterHours";
     // This repo's folder (the look), filled in by install.sh: a profile
@@ -305,6 +308,23 @@ try {
           } catch (e) {
             report("profile set-up", e);
           }
+        }
+      });
+      // Back, forward and reload stay in that order, together (a profile's
+      // saved toolbar can have them otherwise: reload, forward, back)
+      guard("toolbar button order", () => {
+        const { CustomizableUI } = win;
+        const ids = ["back-button", "forward-button", "stop-reload-button"];
+        const at = id => CustomizableUI.getPlacementOfWidget(id);
+        const inOrder = () => ids.every((id, i) => at(id)?.area === CustomizableUI.AREA_NAVBAR &&
+          (i === 0 || at(id).position === at(ids[i - 1]).position + 1));
+        if (!ids.every(id => at(id)?.area === CustomizableUI.AREA_NAVBAR) || inOrder()) {
+          return;
+        }
+        const start = Math.min(...ids.map(id => at(id).position));
+        ids.forEach((id, i) => CustomizableUI.moveWidgetWithinArea(id, start + i));
+        if (!inOrder()) {
+          throw new Error("couldn't put back, forward and reload in order");
         }
       });
       // Vertical tabs stay on even without this script or Betterfox's

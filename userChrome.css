@@ -478,6 +478,40 @@ sidebar-main {
   display: none !important;
 }
 
+/* With no tiles yet, a tab dragged to the top of the list opens a slot for
+   the first one in their place (Firefox's pin drop zone; the script also
+   takes drops just above it): an empty tile across the grid, with a pin,
+   instead of Firefox's dashed box with a caption */
+#tabbrowser-tabs[orient="vertical"] > #pinned-drop-indicator {
+  outline: none !important;
+  border-radius: var(--arc-radius-inner) !important;
+  color: var(--arc-label-secondary) !important;
+  transition: height var(--arc-drag-duration) var(--arc-ease-open), background-color var(--arc-hover-duration) ease !important;
+
+  &[visible] {
+    width: auto !important;
+    height: var(--arc-pinned-tile-height) !important;
+    margin: calc(var(--arc-tile-gap) / 2) var(--tab-container-margin-inline-pinned-expanded, 0px) calc(7px + var(--arc-tile-gap) / 2) !important;
+    background-color: var(--arc-fill-tile) !important;
+
+    > #pinned-drop-indicator-text {
+      display: none !important;
+    }
+  }
+
+  /* (the drop would land: it lights up, like a tile under the pointer) */
+  &[visible][interactive] {
+    background-color: var(--arc-fill-tile-hover) !important;
+    color: var(--arc-focus) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #tabbrowser-tabs[orient="vertical"] > #pinned-drop-indicator {
+    transition: none !important;
+  }
+}
+
 /* A folder being dragged: the script holds its space above + New Tab, so
    the normal tabs below it stay put without Firefox's own offset (which
    would push them down a second time) */
