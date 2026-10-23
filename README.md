@@ -172,7 +172,7 @@ Some of Firefox's interface lives in shadow DOM that `userChrome.css` can't reac
 ```bash
 python3 tests/run_tests.py
 ```
-Launches Firefox with a throwaway test profile using this repo (your own profiles are never touched), drives it through Marionette, Firefox's remote control, and checks: layout and spacing, tile colors, the command bar, shortcuts, closing rules, split view, Peek, the profile switcher, folders, motion, the Apple guidelines checks, auto-hide, the sidebar color, the toolbar's order, the first tile, tab previews during drags, rows and folders across a restart, auto-archive, several windows. Then a brand-new profile without the look, as made from the Profiles menu (its first run and restart), and the empty states in it (nothing pinned, only tiles, only rows). Every launch ends with a check that the script logged no errors. About 4 minutes; `--keep` keeps the test profiles, `--user-js <file>` runs on top of a `user.js`. Needs the script installed; Python 3's standard library only.
+Launches Firefox with a throwaway test profile using this repo (your own profiles are never touched), drives it through Marionette, Firefox's remote control, and checks: layout and spacing, tile colors, the command bar, shortcuts, closing rules, split view, Peek, the profile switcher, folders, motion, the Apple guidelines checks, auto-hide, the sidebar color, the toolbar's order, the first tile, tab previews during drags, rows and folders across a restart, auto-archive, several windows. Then a brand-new profile without the look, as made from the Profiles menu (its first run and restart), and the empty states in it (nothing pinned, only tiles, only rows); and a restart the way Firefox does it for you, with two windows (tiles come back on their pinned page in both). Every launch ends with a check that the script logged no errors. About 5 minutes; `--keep` keeps the test profiles, `--user-js <file>` runs on top of a `user.js`. Needs the script installed; Python 3's standard library only.
 
 ```bash
 python3 tests/drag_tests.py
@@ -183,7 +183,7 @@ Run both after changes and after Firefox updates.
 
 ## History
 
-Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–34).
+Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–35).
 
 1. **Arc layout**: toolbar and URL bar moved into the sidebar, floating page card, Apple-style colors, shadows, radii and motion; auto-hide sidebar with a Spotlight-style floating URL bar; fullscreen support.
 2. **Tiles, pinned rows and folders**: Cmd+D / Cmd+Shift+D, saved and restored rows and folders, Arc-style drag and drop, pinned pages with the away dot and reset-on-close.
@@ -219,6 +219,7 @@ Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (
 32. **Tests for the edges, a doctor, real drags**: a brand-new profile's first run and restart, the empty states; `doctor.sh`, which checks the whole setup; `tests/drag_tests.py`, ten real drag-and-drop cases.
 33. **Audit after the move**: "no tab previews while dragging" had never actually been applied (now tested, and every launch checks for any uncaught script error); LibreWolf leftovers, an old data conversion, fallbacks for older Firefox versions and dead CSS removed; new screenshots.
 34. **Peek with the real mouse**: three real-click cases in the drag tests; a loop that kept forcing the page under a loading Peek to draw is gone (filmed with and without it: no difference). A dragged tile no longer shrinks to a tab's height (Firefox lifts it out of the grid that sized it); the drag test now measures it mid-drag.
+35. **Tiles back on their pinned page after a restart, with several windows**: with two windows open, a tile left on another page (a YouTube video) stayed there after a restart, as if that were its pinned page. Firefox reported the windows restored before the second one's tabs were filled in; each window now also checks once its own tabs are back. A new test phase restarts the way you do, with two windows.
 
 Plans, things to watch and known limitations: see [TODO.md](TODO.md).
 

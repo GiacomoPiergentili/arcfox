@@ -388,8 +388,11 @@
         }
         // Pinned tabs start on their pinned page (tiles come back from
         // Firefox's session where they were left). One without a recorded
-        // pinned page takes the page it shows now.
-        SessionStore.promiseAllWindowsRestored.then(() => {
+        // pinned page takes the page it shows now. Done once the window's
+        // own tabs are restored too: with several windows, Firefox says
+        // they're all restored before a later one's tabs are filled in (its
+        // tiles looked blank then, and came back where they were left)
+        const startOnPinnedPages = () => {
           for (const tab of gBrowser.tabs) {
             if (isPinnedish(tab)) {
               ensureHome(tab);
@@ -398,7 +401,9 @@
               }
             }
           }
-        });
+        };
+        SessionStore.promiseAllWindowsRestored.then(startOnPinnedPages);
+        win.addEventListener("SSWindowRestored", startOnPinnedPages, { once: true });
         gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
           const tab = e.target;
           // the pinned page's title and icon: the page's own, once it has loaded

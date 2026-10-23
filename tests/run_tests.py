@@ -9,14 +9,15 @@ folders, motion, the Apple guidelines checks, auto-hide, the sidebar color
 measurement, the toolbar order, the first tile, tab previews, rows and
 folders across a restart, auto-archive, several windows. Then a brand-new
 profile without the look (its first run, its restart) and the empty states
-in it. Each launch ends with a check that the script logged no errors.
+in it; and a restart with two windows, the way Firefox starts for you. Each
+launch ends with a check that the script logged no errors.
 
 Requirements: Firefox in /Applications and the script installed into it
 (arc-shortcut/install.sh). Nothing else: Python 3 standard library only.
 Your own profile is never touched; the test profiles are deleted afterwards.
 Real drag and drop is in tests/drag_tests.py.
 
-    python3 tests/run_tests.py            # all tests, about 4 minutes
+    python3 tests/run_tests.py            # all tests, about 5 minutes
     python3 tests/run_tests.py --keep     # keep the test profiles (prints their paths)
     python3 tests/run_tests.py --user-js path/to/user.js
                                           # on top of a user.js (e.g. Betterfox's)
@@ -822,6 +823,57 @@ return result({});
 ]
 
 
+# A restart as you'd have it (no page of the test's own: Firefox restores the
+# session), with two windows: tiles come back on their pinned page in both.
+# A local web server gives the tile a site with two pages.
+RESTART_SETUP = r"""
+const t = gBrowser.addTab("__SITE__/", {triggeringPrincipal: P});
+gBrowser.pinTab(t); gBrowser.selectedTab = t; await wait(2000);
+const w2 = OpenBrowserWindow(); await new Promise(k => w2.addEventListener("load", k, {once: true})); await wait(2500);
+window.focus(); await wait(500);
+openTrustedLinkIn("__SITE__/watch?v=1", "current"); await wait(2000);
+check(t.hasAttribute("arc-away"), "the tile is away from its pinned page before the restart");
+return result({});
+"""
+
+RESTARTED = [
+    ("restart with two windows: tiles back on their pinned page", r"""
+await wait(2000);
+const wins = [...Services.wm.getEnumerator("navigator:browser")];
+check(wins.length === 2, "both windows came back: " + wins.length);
+for (const [i, w] of wins.entries()) {
+  const tile = w.gBrowser.tabs.find(t => t.pinned);
+  const st = tile && JSON.parse(SessionStore.getTabState(tile));
+  const url = st?.entries?.[(st.index || 1) - 1]?.url || "";
+  check(/\/$/.test(url) && !/watch/.test(url), "window " + (i + 1) + ": the tile is on its pinned page: " + url);
+  check(tile && !tile.hasAttribute("arc-away"), "window " + (i + 1) + ": not marked away");
+}
+return result({});
+"""),
+]
+
+
+def serve_site():
+    """A local web server with a home page and a page under it; its address."""
+    import http.server
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = ("<title>%s</title>%s" % ("Home" if self.path == "/" else "Video", self.path)).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return "http://127.0.0.1:%d" % server.server_address[1]
+
+
 # ---------------------------------------------------------------- runner
 def write_prefs(profile, prefs=None):
     prefs = PREFS if prefs is None else prefs
@@ -844,10 +896,12 @@ def close_all():
             proc.kill()
 
 
-def launch(profile):
-    log = open(os.path.join(profile, "firefox.log"), "w")
+def launch(profile, page="about:blank"):
+    """Starts a test browser on the profile; page=None opens no page of its
+    own, so Firefox restores the session the way it does for you."""
+    log = open(os.path.join(profile, "firefox.log"), "a")
     proc = subprocess.Popen([APP, "-profile", profile, "-no-remote", "--marionette",
-                             "--remote-allow-system-access", "about:blank"],
+                             "--remote-allow-system-access"] + ([page] if page else []),
                             stdout=log, stderr=subprocess.STDOUT)
     LAUNCHED.append(proc)
     for _ in range(60):
@@ -919,6 +973,24 @@ def main():
             quit(proc, mn)
             proc, mn = launch(fresh)
             run(mn, EMPTY, results)
+            quit(proc, mn)
+        if go_on:
+            # a restart as you'd have it, with two windows
+            again = tempfile.mkdtemp(prefix="arcfox-test-restart-")
+            profiles.append(again)
+            os.symlink(REPO, os.path.join(again, "chrome"))
+            write_prefs(again)
+            site = serve_site()
+            proc, mn = launch(again)
+            res = mn.js(RESTART_SETUP.replace("__SITE__", site))
+            if not res["ok"]:
+                results.append(("restart with two windows: set-up", False))
+                print("FAIL  restart with two windows: set-up")
+                for f in res["fail"]:
+                    print("        - " + f)
+            quit(proc, mn)
+            proc, mn = launch(again, page=None)
+            run(mn, RESTARTED, results)
             quit(proc, mn)
     finally:
         # (never leave a test browser running: it would hold the port)
