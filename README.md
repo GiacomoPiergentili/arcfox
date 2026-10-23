@@ -50,6 +50,7 @@ Tested on **Firefox 158** with Betterfox, on macOS, in dark and light mode.
 ### New tab = command bar
 - Cmd+T and + New Tab open the floating URL bar instead of creating a tab; the tab is created only when Enter loads something (picking an open tab switches to it). Esc, clicking away or pressing again closes it.
 - Launch and new windows start with that bar over an empty page instead of a blank tab.
+- No search engine button: typing searches with your default engine, the text lined up with the results' icons. A search shortcut (picked with Tab, or typed as `@name`) still shows its engine, with a × to leave it.
 - No stray blank tabs: double-clicking empty sidebar space does nothing; Cmd+W on the only tab leaves the empty page, and Cmd+W on the empty page closes the window, as in other Mac apps.
 
 ### Split view (as in Arc)
@@ -185,7 +186,7 @@ Run both after changes and after Firefox updates.
 
 ## History
 
-Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–37).
+Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–38).
 
 1. **Arc layout**: toolbar and URL bar moved into the sidebar, floating page card, Apple-style colors, shadows, radii and motion; auto-hide sidebar with a Spotlight-style floating URL bar; fullscreen support.
 2. **Tiles, pinned rows and folders**: Cmd+D / Cmd+Shift+D, saved and restored rows and folders, Arc-style drag and drop, pinned pages with the away dot and reset-on-close.
@@ -224,6 +225,7 @@ Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (
 35. **Tiles back on their pinned page after a restart, with several windows**: with two windows open, a tile left on another page (a YouTube video) stayed there after a restart, as if that were its pinned page. Firefox reported the windows restored before the second one's tabs were filled in; each window now also checks once its own tabs are back. A new test phase restarts the way you do, with two windows.
 36. **One window at launch**: the one used last, the others kept in Recently Closed Windows (`arc.restoreOneWindow`); checked in both of Firefox's start modes.
 37. **Popup windows**: iCloud Passwords' code window got the whole sidebar and never closed (the closing rules kept it open on the empty page when its page closed itself). Popups are now left alone by the script and the CSS; and Cmd+W on the empty page closes the window.
+38. **No search engine button** in the URL bar, except while a search shortcut is in use.
 
 Plans, things to watch and known limitations: see [TODO.md](TODO.md).
 

@@ -1085,6 +1085,13 @@ sidebar-main {
   display: none !important;
 }
 
+/* No engine button: typing searches with the default engine. The pill shows
+   only in search mode (a search shortcut picked with Tab, or @name), with
+   that engine's icon and the × to leave it */
+#urlbar:not([searchmode]) .searchmode-switcher {
+  display: none !important;
+}
+
 /* Engine pill: corners concentric with the bar (bar radius minus the gap) */
 #urlbar .searchmode-switcher {
   --button-border-radius: calc(var(--arc-radius) - var(--urlbar-input-container-padding)) !important;
@@ -1287,6 +1294,12 @@ panel toolbarseparator {
 
   #urlbar-input {
     font-size: var(--arc-spotlight-font-size) !important;
+  }
+
+  /* With no engine button before it, the text starts on the results' icon
+     column (17px in, as measured: 7px more than the field's own inset) */
+  #urlbar:not([searchmode]) #urlbar-input {
+    padding-inline-start: 7px !important;
   }
 
   #urlbar .searchmode-switcher-dropmarker {

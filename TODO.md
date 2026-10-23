@@ -44,6 +44,7 @@ Nothing queued.
 
 ## Done
 
+- [x] No search engine button in the URL bar (it shows only in search mode, with its ×); the command bar's text starts on the results' icon column. New test; the README's command-bar screenshot retaken.
 - [x] Popup windows (iCloud Passwords' code window, sign-in windows): the script skips them and the CSS gives them the plain look (`[popup-window]`); they close with their page, instead of staying on the empty page. Cmd+W on the empty page now closes the window (it did nothing). Tested with a popup opened the way the add-on API opens it.
 - [x] Launch opens one window, the one used last: the script trims Firefox's restore plan once it's read, before any window opens; the others go to Recently Closed Windows (or Restore Previous Session, as Firefox starts by default). `arc.restoreOneWindow` (default true). Checked in both start modes. The profile opened is already the last used one (Firefox keeps the group's default on the profile whose window was active last).
 - [x] Fixed: with two windows, a tile left on another page (a YouTube video) came back there after a restart instead of on its pinned page (the pinned page itself was still recorded right). Firefox says all windows are restored before a later window's tabs are filled in; each window now also checks when its own tabs are back (`SSWindowRestored`). New test phase: a restart with two windows, the way Firefox starts for you.

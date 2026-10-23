@@ -606,6 +606,22 @@ check(tiles().map(t => t.label).join() === before.map(t => t.label).join(), "(ti
 return result({});
 """),
 
+    ("no search engine button, except in search mode", r"""
+const shown = () => { const s = document.querySelector("#urlbar .searchmode-switcher"); return !!s && s.getBoundingClientRect().width > 0; };
+if (!barOpen()) { newTabKey(); await wait(800); }
+check(barOpen(), "(the command bar is open)");
+check(!shown(), "no engine button in the command bar");
+const { SearchService } = ChromeUtils.importESModule("moz-src:///toolkit/components/search/SearchService.sys.mjs");
+gURLBar.searchMode = {engineName: (await SearchService.getDefault()).name, entry: "keywordoffer"}; await wait(400);
+check(shown(), "in search mode, the pill shows the engine (and its ×)");
+gURLBar.searchMode = null; await wait(300);
+check(!shown(), "gone again after leaving search mode");
+window.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); await wait(800);
+gBrowser.selectedBrowser.focus(); await wait(300);
+check(!shown(), "none in the sidebar's URL bar either");
+return result({});
+"""),
+
     ("popup windows stay plain, and close when their page does", r"""
 // a window as an add-on's windows.create({type: "popup"}) makes it (iCloud
 // Passwords' code window)
