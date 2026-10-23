@@ -270,7 +270,9 @@ def frontmost(pid):
     subprocess.run(["osascript", "-e",
                     'tell application "System Events" to set frontmost of (first process whose unix id is %d) to true' % pid],
                    capture_output=True)
-    time.sleep(0.8)
+    # (long enough for the window to have come forward: a press while it's
+    # still activating can be lost)
+    time.sleep(1.2)
 
 
 def window_rect(mn):
@@ -314,7 +316,9 @@ def main():
                     raise RuntimeError("layout set-up failed: %s" % res["fail"])
                 mn.js("window.__arcErrorMark = scriptErrors().length; return 1;")
                 for i, (action, expect) in enumerate(steps):
-                    act = mn.js(PRELUDE + action)
+                    # (the layout settled first: the press must land on what
+                    # the points were measured on, not on something still gliding)
+                    act = mn.js(PRELUDE + "await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))); await wait(300);\n" + action)
                     # a drag's points, or a click (same point down and up)
                     click = isinstance(act, dict)
                     points = [act["click"], act["click"]] if click else act

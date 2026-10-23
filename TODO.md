@@ -17,7 +17,7 @@ Nothing queued.
 ## To watch
 - The first Firefox update with automatic updates on (159): the reinstall should happen by itself and `doctor.sh` come back clean. Right after the very first install into Firefox.app, Firefox's first launch once restarted itself without its arguments (on the default profile); not seen since, but each reinstall changes the app again.
 
-- `tests/drag_tests.py`'s "tiles reordered" failed once in about a dozen runs (Blue stayed last); not reproduced since. If it repeats, record it (`--record`).
+- `tests/drag_tests.py`: two cases each failed once in full runs with nothing moved ("tiles reordered", "tile into the rows"), never while recording; it now waits for the layout's animations and for the window to come forward before pressing. If it repeats, record it (`--record`). A case can also stop with "the drag tool refused" when something else (a notification) covers the point: that's the tool's safety check, not a failure of arcfox.
 
 ## Known limitations
 - Apple guidelines, not done: the pinned page dot can't take keyboard focus (its action is in the tab's context menu); the sidebar can't be translucent (Firefox allows no blur behind its own interface); our few labels are English only.
@@ -44,6 +44,7 @@ Nothing queued.
 
 ## Done
 
+- [x] Launch opens one window, the one used last: the script trims Firefox's restore plan once it's read, before any window opens; the others go to Recently Closed Windows (or Restore Previous Session, as Firefox starts by default). `arc.restoreOneWindow` (default true). Checked in both start modes. The profile opened is already the last used one (Firefox keeps the group's default on the profile whose window was active last).
 - [x] Fixed: with two windows, a tile left on another page (a YouTube video) came back there after a restart instead of on its pinned page (the pinned page itself was still recorded right). Firefox says all windows are restored before a later window's tabs are filled in; each window now also checks when its own tabs are back (`SSWindowRestored`). New test phase: a restart with two windows, the way Firefox starts for you.
 - [x] Peek with the real mouse: three cases in `tests/drag_tests.py` (from a tile, Option+click, from a pinned row; closing by a click on the dimmed page, Open as Tab, Open in Split View), on pages from a local web server. Peek's loop forcing the page underneath to keep drawing (20 times a second while a Peek loaded) is gone: filmed with and without it, the page underneath never flashed either way. Fixed: a tile shrank to 32px while dragged (Firefox lifts the dragged tab out of the grid that gave it its height); checked mid-drag by the reorder case.
 - [x] Audit and cleanup after the move: "no tab previews while dragging" had never been applied (an unreachable function; now tested, and every launch checks for any uncaught script error); a misspelled focus-colour variable; the test runner's silent relaunch (it hid failures); orphaned test browsers; doctor and installer fixes; `betterfox/update.sh` checks what it fetches; LibreWolf leftovers (`sidebar.revamp`, comments, `.gitignore`), an old data conversion, fallbacks for older Firefox and dead CSS removed. `::part()` from userChrome.css was re-checked on Firefox: still ignored, so the tile grid style stays injected.

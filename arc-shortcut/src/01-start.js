@@ -117,6 +117,36 @@ try {
       }
     };
 
+    // Launch opens one window: the one used last (arc.restoreOneWindow). The
+    // others of the saved session go to History > Recently Closed Windows
+    // instead of opening too. Done to the restore plan once it's read and
+    // before any window opens from it, so nothing opens and closes again.
+    // (Tiles, rows and folders are the same in every window anyway.)
+    const RESTORE_ONE_PREF = "arc.restoreOneWindow";
+    defaults.setBoolPref(RESTORE_ONE_PREF, true);
+    obs.addObserver(function oneWindow() {
+      obs.removeObserver(oneWindow, "sessionstore-state-finalized");
+      try {
+        if (!prefs.getBoolPref(RESTORE_ONE_PREF, true)) {
+          return;
+        }
+        const { SessionStartup } = ChromeUtils.importESModule("moz-src:///browser/components/sessionstore/SessionStartup.sys.mjs");
+        const state = SessionStartup.state;
+        if (!(state?.windows?.length > 1)) {
+          return;
+        }
+        // (selectedWindow counts from 1)
+        const keep = Math.min(Math.max((state.selectedWindow || 1) - 1, 0), state.windows.length - 1);
+        const others = state.windows.filter((w, i) => i !== keep);
+        const closedAt = Date.now();
+        state._closedWindows = [...others.map(w => ({ ...w, closedAt })), ...(state._closedWindows || [])];
+        state.windows = [state.windows[keep]];
+        state.selectedWindow = 1;
+      } catch (e) {
+        report("one window at launch", e);
+      }
+    }, "sessionstore-state-finalized");
+
     // A starting window's tab list stays hidden ([arc-starting]) until its
     // tiles, rows, folders and start page are in place, then fades in:
     // otherwise they popped in one by one (a stray "New Tab" row, blank

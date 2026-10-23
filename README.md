@@ -38,6 +38,7 @@ Tested on **Firefox 158** with Betterfox, on macOS, in dark and light mode.
 - **Pinned page**: each row and tile remembers the page it was pinned on. A dot shows when it's somewhere else; clicking the dot (or Cmd+W, or the right-click menu) goes back.
 - **Tile colors** (as in Zen): the selected tile takes its icon's colors, as a soft gradient with a hairline in the main color.
 - **Every window shows the same tiles, rows and folders**, kept in sync. Private windows keep to themselves.
+- **Launch opens one window**: the one you used last, with its tiles and rows back on their pinned pages. Any other windows of the last session wait in History → Recently Closed Windows (or, as Firefox starts by default, History → Restore Previous Session). `arc.restoreOneWindow` = `false` in `about:config` brings them all back instead. Firefox itself opens the profile you used last.
 
 ### Drag and drop (as in Arc)
 - Between tiles, rows, folders and normal tabs, with live cues: a tab dropped on the tiles becomes a tile right where it's dropped (the tiles slide aside, the grid grows a line if needed); a tab dropped above the divider becomes a pinned row, below it a normal tab; whatever moves when a drop lands glides there.
@@ -163,7 +164,7 @@ Worth knowing before you install:
 | `doctor.sh` | Checks the whole setup (reads only). |
 | `tests/` | `run_tests.py` and `drag_tests.py`, see below. |
 
-The script keeps its state in prefs and session data: tiles in `arc.tiles`, pinned rows and folders in `arc.pinnedRows` (the shared list every window follows; each item has an id, `arc-id` on its tabs), the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, and each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
+The script keeps its state in prefs and session data: tiles in `arc.tiles`, pinned rows and folders in `arc.pinnedRows` (the shared list every window follows; each item has an id, `arc-id` on its tabs), the auto-archive time in `arc.archiveAfterHours`, the measured sidebar colors in `arc.sidebarColor.dark` / `.light`, one window at launch in `arc.restoreOneWindow`, and each tab's pinned page in the session value `arc-pinned-page`. The CSS reacts to attributes the script sets (`[arc-pinned-row]`, `[arc-away]`, `[arc-newtab-bar]`, `[arc-start-page]`, `[arc-tile-colored]`, ...).
 
 Some of Firefox's interface lives in shadow DOM that `userChrome.css` can't reach (`::part()` doesn't apply from it); there the script adds small style blocks itself (the sidebar's bottom buttons, the tile grid).
 
@@ -172,7 +173,7 @@ Some of Firefox's interface lives in shadow DOM that `userChrome.css` can't reac
 ```bash
 python3 tests/run_tests.py
 ```
-Launches Firefox with a throwaway test profile using this repo (your own profiles are never touched), drives it through Marionette, Firefox's remote control, and checks: layout and spacing, tile colors, the command bar, shortcuts, closing rules, split view, Peek, the profile switcher, folders, motion, the Apple guidelines checks, auto-hide, the sidebar color, the toolbar's order, the first tile, tab previews during drags, rows and folders across a restart, auto-archive, several windows. Then a brand-new profile without the look, as made from the Profiles menu (its first run and restart), and the empty states in it (nothing pinned, only tiles, only rows); and a restart the way Firefox does it for you, with two windows (tiles come back on their pinned page in both). Every launch ends with a check that the script logged no errors. About 5 minutes; `--keep` keeps the test profiles, `--user-js <file>` runs on top of a `user.js`. Needs the script installed; Python 3's standard library only.
+Launches Firefox with a throwaway test profile using this repo (your own profiles are never touched), drives it through Marionette, Firefox's remote control, and checks: layout and spacing, tile colors, the command bar, shortcuts, closing rules, split view, Peek, the profile switcher, folders, motion, the Apple guidelines checks, auto-hide, the sidebar color, the toolbar's order, the first tile, tab previews during drags, rows and folders across a restart, auto-archive, several windows. Then a brand-new profile without the look, as made from the Profiles menu (its first run and restart), and the empty states in it (nothing pinned, only tiles, only rows); and a restart the way Firefox does it for you, with two windows (one comes back, the one used last, its tiles on their pinned page). Every launch ends with a check that the script logged no errors. About 5 minutes; `--keep` keeps the test profiles, `--user-js <file>` runs on top of a `user.js`. Needs the script installed; Python 3's standard library only.
 
 ```bash
 python3 tests/drag_tests.py
@@ -183,7 +184,7 @@ Run both after changes and after Firefox updates.
 
 ## History
 
-Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–35).
+Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–36).
 
 1. **Arc layout**: toolbar and URL bar moved into the sidebar, floating page card, Apple-style colors, shadows, radii and motion; auto-hide sidebar with a Spotlight-style floating URL bar; fullscreen support.
 2. **Tiles, pinned rows and folders**: Cmd+D / Cmd+Shift+D, saved and restored rows and folders, Arc-style drag and drop, pinned pages with the away dot and reset-on-close.
@@ -220,6 +221,7 @@ Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (
 33. **Audit after the move**: "no tab previews while dragging" had never actually been applied (now tested, and every launch checks for any uncaught script error); LibreWolf leftovers, an old data conversion, fallbacks for older Firefox versions and dead CSS removed; new screenshots.
 34. **Peek with the real mouse**: three real-click cases in the drag tests; a loop that kept forcing the page under a loading Peek to draw is gone (filmed with and without it: no difference). A dragged tile no longer shrinks to a tab's height (Firefox lifts it out of the grid that sized it); the drag test now measures it mid-drag.
 35. **Tiles back on their pinned page after a restart, with several windows**: with two windows open, a tile left on another page (a YouTube video) stayed there after a restart, as if that were its pinned page. Firefox reported the windows restored before the second one's tabs were filled in; each window now also checks once its own tabs are back. A new test phase restarts the way you do, with two windows.
+36. **One window at launch**: the one used last, the others kept in Recently Closed Windows (`arc.restoreOneWindow`); checked in both of Firefox's start modes.
 
 Plans, things to watch and known limitations: see [TODO.md](TODO.md).
 

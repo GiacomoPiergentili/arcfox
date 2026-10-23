@@ -824,8 +824,9 @@ return result({});
 
 
 # A restart as you'd have it (no page of the test's own: Firefox restores the
-# session), with two windows: tiles come back on their pinned page in both.
-# A local web server gives the tile a site with two pages.
+# session), with two windows: one comes back, the one used last, its tile on
+# its pinned page; the other is in Recently Closed Windows. A local web
+# server gives the tile a site with two pages.
 RESTART_SETUP = r"""
 const t = gBrowser.addTab("__SITE__/", {triggeringPrincipal: P});
 gBrowser.pinTab(t); gBrowser.selectedTab = t; await wait(2000);
@@ -833,14 +834,26 @@ const w2 = OpenBrowserWindow(); await new Promise(k => w2.addEventListener("load
 window.focus(); await wait(500);
 openTrustedLinkIn("__SITE__/watch?v=1", "current"); await wait(2000);
 check(t.hasAttribute("arc-away"), "the tile is away from its pinned page before the restart");
+// (tells the windows apart after the restart by their width: the one
+// Firefox counts as used last is 1200px wide, the other 900px)
+const { BrowserWindowTracker } = ChromeUtils.importESModule("resource:///modules/BrowserWindowTracker.sys.mjs");
+const top = BrowserWindowTracker.getTopWindow();
+for (const w of Services.wm.getEnumerator("navigator:browser")) {
+  w.resizeTo(w === top ? 1200 : 900, 700);
+}
+await wait(1500);
 return result({});
 """
 
 RESTARTED = [
-    ("restart with two windows: tiles back on their pinned page", r"""
+    ("restart with two windows: one comes back, its tiles on their pinned page", r"""
 await wait(2000);
 const wins = [...Services.wm.getEnumerator("navigator:browser")];
-check(wins.length === 2, "both windows came back: " + wins.length);
+check(wins.length === 1, "one window came back: " + wins.length);
+check(near(window.outerWidth, 1200, 2), "the one used last (1200px wide): " + window.outerWidth);
+// (in Recently Closed Windows; or, as Firefox starts by default, with the
+// rest of the session under History > Restore Previous Session)
+check(SessionStore.getClosedWindowCount() >= 1 || SessionStore.canRestoreLastSession, "the other one can be reopened");
 for (const [i, w] of wins.entries()) {
   const tile = w.gBrowser.tabs.find(t => t.pinned);
   const st = tile && JSON.parse(SessionStore.getTabState(tile));
