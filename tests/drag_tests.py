@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Real drag-and-drop checks for arcfox.
+"""Real-mouse checks for arcfox: drag and drop, and Peek.
 
 Drag and drop is where most bugs have been, and simulated events miss what
 real ones do (Firefox's own drag code, timers, the pointer leaving the tab
-list). These cases move the real mouse, in a throwaway test browser like
-run_tests.py's, and check where everything lands, plus what must hold after
-any drag: no window torn off, no drag state or offsets left behind, no
-script errors, and the saved tiles and rows matching the sidebar.
+list); Peek starts from a real click on a page. These cases move the real
+mouse, in a throwaway test browser like run_tests.py's, and check where
+everything lands, plus what must hold after each case: no window torn off,
+no drag state or offsets left behind, no script errors, and the saved tiles
+and rows matching the sidebar. The Peek cases use a small local web server
+(127.0.0.1), no internet.
 
 The mouse moves only through ~/.arc-drag/drag, which refuses unless the
 test window is frontmost and on top at every point. Don't touch the mouse
-or keyboard while it runs (about 2½ minutes); not run by run_tests.py.
+or keyboard while it runs (about 4 minutes); not run by run_tests.py.
 
     python3 tests/drag_tests.py                  # all cases
     python3 tests/drag_tests.py --only folder    # cases whose name has "folder"
@@ -55,9 +57,20 @@ check(JSON.stringify(labels("tile")) === JSON.stringify(["Red", "Normal 1", "Gre
 """),
 
     ("tiles reordered: the last one first", r"""
+// (the dragged tile's height, every 50ms while it's dragged)
+window.__heights = [];
+clearInterval(window.__heightTimer);
+window.__heightTimer = setInterval(() => {
+  const d = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget][pinned]");
+  if (d) window.__heights.push(Math.round(d.querySelector(".tab-background").getBoundingClientRect().height));
+}, 50);
 return [at(tab("Blue")), ...hold(at(tab("Red"), 0.25, 0.5), 3)];
 """, r"""
+clearInterval(window.__heightTimer);
 check(JSON.stringify(labels("tile")) === JSON.stringify(["Blue", "Red", "Green"]), "Blue comes first: " + labels("tile"));
+const tileH = bg(tab("Red")).h;
+check(window.__heights.length > 5, "the dragged tile was measured: " + window.__heights.length + " times");
+check(window.__heights.every(h => near(h, tileH, 1)), "it keeps a tile's height while dragged (" + tileH + "px): " + [...new Set(window.__heights)].join(", "));
 """),
 
     ("tile into the rows, between Row A and Row B", r"""
@@ -127,6 +140,116 @@ check(!document.getElementById("pinned-drop-indicator").hasAttribute("visible"),
 """),
 ]
 
+# Peek, with real clicks: a case may have more steps after its first one,
+# (action, check) pairs; an action returns either a drag's points or
+# {"click": point, "mods": "alt"}. The page is one big link to another site,
+# so any click on it follows the link.
+# (served from 127.0.0.1, see serve_linker: a page needs a host for its links
+# to count as going to another site; a data: page has none)
+PEEK_PAGE = "__LINKER_URL__"
+# Its link goes to another site on the same server (localhost, not
+# 127.0.0.1), answered after a delay: the Peek's waiting phase, with the page
+# underneath kept drawn, lasts long enough to see
+LINKER_HTML = '<title>Linker</title><a href="http://localhost:%d/target" style="position:fixed;inset:0;display:block;background:#eef">target</a>'
+TARGET_HTML = b'<title>Target</title><body style="background:#223;color:#fff;font:40px system-ui">Target'
+
+
+def serve_linker():
+    """A local web server for the Peek pages; returns the linker's address."""
+    import http.server
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/target":
+                time.sleep(1.5)
+                body = TARGET_HTML
+            else:
+                body = (LINKER_HTML % self.server.server_address[1]).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return "http://127.0.0.1:%d/linker" % server.server_address[1]
+PEEK_PRELUDE = r"""
+const peekTab = () => gBrowser.tabs.find(t => t.hasAttribute("arc-peek-tab"));
+const linker = async how => {
+  const t = gBrowser.addTab("%s", {triggeringPrincipal: P});
+  if (how === "tile") gBrowser.pinTab(t);
+  gBrowser.selectedTab = t; await wait(400);
+  if (how === "row") { document.getElementById("addBookmarkAsKb").doCommand(); await wait(500); }
+  await wait(1200);
+  return t;
+};
+const onPage = (fx = 0.5, fy = 0.5) => at(gBrowser.selectedBrowser, fx, fy);
+const peekOpen = () => {
+  check(root.hasAttribute("arc-peek") && !!peekTab(), "a Peek is open");
+  check(!!document.querySelector("#tabbrowser-tabpanels [arc-peek-card]"), "its card shows");
+  check(document.getElementById("arc-peek-bar").hasAttribute("shown"), "its buttons show");
+  check(peekTab() && R(peekTab()).h === 0, "the Peek isn't listed in the sidebar");
+};
+""" % PEEK_PAGE
+
+CASES += [
+    ("Peek from a tile, closed by a click on the dimmed page", PEEK_PRELUDE + r"""
+window.__home = await linker("tile");
+return {click: onPage()};
+""", PEEK_PRELUDE + r"""
+await wait(2500);
+peekOpen();
+check(window.__home.hasAttribute("arc-peek-home"), "the tile stays highlighted");
+check(document.querySelector("#arc-peek-bar .arc-peek-split")?.hidden, "no Split View from a tile");
+""", PEEK_PRELUDE + r"""
+const tp = gBrowser.tabpanels.getBoundingClientRect();
+return {click: [Math.round(mozInnerScreenX + tp.left + tp.width * 0.03), Math.round(mozInnerScreenY + tp.top + tp.height * 0.5)]};
+""", PEEK_PRELUDE + r"""
+await wait(1000);
+check(!root.hasAttribute("arc-peek") && !peekTab(), "closed");
+check(gBrowser.selectedTab === window.__home, "back on the tile");
+check(!gBrowser.tabpanels.hasAttribute("splitview"), "one page on screen again");
+"""),
+
+    ("Option+click in a normal tab: Peek, then Open as Tab", PEEK_PRELUDE + r"""
+window.__home = await linker("tab");
+return {click: onPage(), mods: "alt"};
+""", PEEK_PRELUDE + r"""
+await wait(2500);
+peekOpen();
+""", PEEK_PRELUDE + r"""
+return {click: at(document.querySelector("#arc-peek-bar .arc-peek-expand"))};
+""", PEEK_PRELUDE + r"""
+await wait(1000);
+const t = gBrowser.selectedTab;
+check(!root.hasAttribute("arc-peek"), "the Peek is gone");
+check(/\/target$/.test(t.linkedBrowser.currentURI.spec) && !t.hasAttribute("arc-peek-tab"), "its page is the selected tab now");
+check(!t.pinned && !isRow(t) && R(t).h > 0, "a normal tab, listed in the sidebar");
+check(window.__home.isConnected, "the page it came from is still open");
+"""),
+
+    ("Peek from a pinned row, then Open in Split View", PEEK_PRELUDE + r"""
+window.__home = await linker("row");
+return {click: onPage()};
+""", PEEK_PRELUDE + r"""
+await wait(2500);
+peekOpen();
+check(!document.querySelector("#arc-peek-bar .arc-peek-split")?.hidden, "Split View is offered from a row");
+""", PEEK_PRELUDE + r"""
+return {click: at(document.querySelector("#arc-peek-bar .arc-peek-split"))};
+""", PEEK_PRELUDE + r"""
+await wait(1200);
+const sv = window.__home.splitview;
+check(!root.hasAttribute("arc-peek"), "the Peek is gone");
+check(!!sv && sv.tabs.some(t => /\/target$/.test(t.linkedBrowser.currentURI.spec)), "the row and the linked page side by side");
+check(isRow(window.__home), "the row is still a row");
+"""),
+]
+
 # After every drag
 INVARIANTS = r"""
 check([...Services.wm.getEnumerator("navigator:browser")].length === 1, "no window torn off");
@@ -164,7 +287,7 @@ def main():
     if record:
         os.makedirs(record, exist_ok=True)
     cases = [c for c in CASES if not only or only in c[0]]
-    print("Real mouse drags in a test window: don't touch the mouse or keyboard (about %ds)." % (len(cases) * 12 + 15))
+    print("Real mouse in a test window: don't touch the mouse or keyboard (about %ds)." % (len(cases) * 15 + 15))
     time.sleep(3)
     profile = tempfile.mkdtemp(prefix="arcfox-drag-")
     os.symlink(T.REPO, os.path.join(profile, "chrome"))
@@ -179,29 +302,41 @@ def main():
             for f in res["fail"]:
                 print("        - " + f)
             sys.exit(1)
-        for name, setup, expect in cases:
+        linker_url = serve_linker()
+        for case in cases:
+            name = case[0]
+            steps = [(a.replace("__LINKER_URL__", linker_url), e) for a, e in zip(case[1::2], case[2::2])]
             start = time.time()
             fails = []
             try:
                 res = mn.js(T.SETUP)
                 if not res["ok"]:
                     raise RuntimeError("layout set-up failed: %s" % res["fail"])
-                points = mn.js(PRELUDE + "window.__arcErrorMark = scriptErrors().length;\n" + setup)
-                frontmost(proc.pid)
-                rec = None
-                if record:
-                    x, y, w, h = window_rect(mn)
-                    movie = os.path.join(record, "".join(c if c.isalnum() else "-" for c in name) + ".mov")
-                    rec = subprocess.Popen(["screencapture", "-x", "-v", "-V", str(len(points) * 0.4 + 4), "-R%d,%d,%d,%d" % (x, y, w, h), movie])
-                    time.sleep(0.6)
-                drag = subprocess.run([DRAG, str(proc.pid), "300", "16"] + ["%d,%d" % tuple(p) for p in points],
-                                      capture_output=True, text=True)
-                if rec:
-                    rec.wait()
-                if drag.returncode != 0:
-                    raise RuntimeError("the drag tool refused: " + (drag.stdout + drag.stderr).strip())
-                res = mn.js("await wait(1200);\n" + PRELUDE + expect + INVARIANTS + "\nreturn result({});")
-                fails = res["fail"]
+                mn.js("window.__arcErrorMark = scriptErrors().length; return 1;")
+                for i, (action, expect) in enumerate(steps):
+                    act = mn.js(PRELUDE + action)
+                    # a drag's points, or a click (same point down and up)
+                    click = isinstance(act, dict)
+                    points = [act["click"], act["click"]] if click else act
+                    env = dict(os.environ, DRAG_MODS=act.get("mods", "")) if click else None
+                    frontmost(proc.pid)
+                    rec = None
+                    if record:
+                        x, y, w, h = window_rect(mn)
+                        movie = os.path.join(record, "".join(c if c.isalnum() else "-" for c in name) + ("-%d" % (i + 1) if len(steps) > 1 else "") + ".mov")
+                        rec = subprocess.Popen(["screencapture", "-x", "-v", "-V", str(len(points) * 0.4 + 4), "-R%d,%d,%d,%d" % (x, y, w, h), movie])
+                        time.sleep(0.6)
+                    drag = subprocess.run([DRAG, str(proc.pid), "60" if click else "300", "16"] + ["%d,%d" % tuple(p) for p in points],
+                                          capture_output=True, text=True, env=env)
+                    if rec:
+                        rec.wait()
+                    if drag.returncode != 0:
+                        raise RuntimeError("the drag tool refused: " + (drag.stdout + drag.stderr).strip())
+                    last = i == len(steps) - 1
+                    res = mn.js("await wait(1200);\n" + PRELUDE + expect + (INVARIANTS if last else "") + "\nreturn result({});")
+                    fails = ["step %d: %s" % (i + 1, f) if len(steps) > 1 else f for f in res["fail"]]
+                    if fails:
+                        break
             except Exception as e:
                 fails = ["error: " + str(e)[:300]]
             ok = not fails

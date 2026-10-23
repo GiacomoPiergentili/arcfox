@@ -562,6 +562,14 @@ sidebar-main {
   transform: none !important;
 }
 
+/* A dragged tile keeps a tile's height: Firefox lifts the dragged tab out of
+   the grid (position: absolute), whose rows gave it that height, so it
+   shrank to a tab's 32px (until the drop had fully landed, too). Not over
+   the rows, where it takes a row's shape (below). */
+:root:not([arc-drag-over-rows]) #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] .tab-background {
+  min-height: var(--arc-pinned-tile-height) !important;
+}
+
 /* A tile dragged out of the grid takes a row's shape, in the row
    column ([arc-drag-over-rows], --arc-row-w and --arc-row-dx from the script) */
 :root[arc-drag-over-rows] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget][pinned] {

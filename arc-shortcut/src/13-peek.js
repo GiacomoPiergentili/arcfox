@@ -108,16 +108,6 @@
           card?.setAttribute("arc-peek-waiting", "");
           keepDrawn(home, true);
           show();
-          const keepHomeDrawn = win.setInterval(() => {
-            if (peek?.tab !== tab) {
-              win.clearInterval(keepHomeDrawn);
-              return;
-            }
-            try {
-              home.linkedBrowser.docShellIsActive = true;
-              home.linkedBrowser.renderLayers = true;
-            } catch {}
-          }, 50);
           const spinnerAt = press || { x: box.left + box.width / 2, y: box.top + box.height / 2 };
           peekSpinner.style.left = `${spinnerAt.x}px`;
           peekSpinner.style.top = `${spinnerAt.y}px`;
@@ -129,7 +119,6 @@
             }
             revealed = true;
             win.clearTimeout(spinnerTimer);
-            win.clearInterval(keepHomeDrawn);
             gBrowser.removeTabsProgressListener(listener);
             peekSpinner.removeAttribute("shown");
             card?.removeAttribute("arc-peek-waiting");

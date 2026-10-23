@@ -177,13 +177,13 @@ Launches Firefox with a throwaway test profile using this repo (your own profile
 ```bash
 python3 tests/drag_tests.py
 ```
-Real drag and drop, which simulated events miss. The real mouse moves in a test window, through `~/.arc-drag/drag` (a small tool outside the repo that refuses unless the test window is in front and on top at every point), so keep your hands off the mouse for about 2½ minutes. Ten cases: a tab into the tiles at a spot, tiles reordered, a tile into the rows and down to the normal tabs, a tab into the rows and a row down to the normal tabs, a tab into a folder, a detour over the page and back, a drop on the page making a split view, and the first tile with no tiles yet. After each, it checks where everything landed, and that no window was torn off, no drag state or offset is left behind, the script logged no errors, and the saved tiles and rows match the sidebar. `--only <text>` runs some cases, `--record <dir>` films each drag (the test window only).
+Real drag and drop and real clicks, which simulated events miss. The real mouse moves in a test window, through `~/.arc-drag/drag` (a small tool outside the repo that refuses unless the test window is in front and on top at every point), so keep your hands off the mouse for about 4 minutes. Ten drags: a tab into the tiles at a spot, tiles reordered, a tile into the rows and down to the normal tabs, a tab into the rows and a row down to the normal tabs, a tab into a folder, a detour over the page and back, a drop on the page making a split view, and the first tile with no tiles yet. Three Peeks, from a link on a page served by a small local web server: from a tile (closed by a click on the dimmed page), Option+click in a normal tab (then Open as Tab), from a pinned row (then Open in Split View). After each, it checks where everything landed, and that no window was torn off, no drag state or offset is left behind, the script logged no errors, and the saved tiles and rows match the sidebar. `--only <text>` runs some cases, `--record <dir>` films each drag (the test window only).
 
 Run both after changes and after Firefox updates.
 
 ## History
 
-Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–33).
+Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (29–34).
 
 1. **Arc layout**: toolbar and URL bar moved into the sidebar, floating page card, Apple-style colors, shadows, radii and motion; auto-hide sidebar with a Spotlight-style floating URL bar; fullscreen support.
 2. **Tiles, pinned rows and folders**: Cmd+D / Cmd+Shift+D, saved and restored rows and folders, Arc-style drag and drop, pinned pages with the away dot and reset-on-close.
@@ -218,6 +218,7 @@ Built over October 20–23, 2026: first on LibreWolf (1–28), then on Firefox (
 31. **Fixes**: back, forward and reload kept in that order (a saved toolbar could reverse them); the first tile by drag and drop, with no tiles yet (Firefox's drop zone opened late, under the dragged tab, and a release above it was lost); the divider centered in every state, and gone when nothing is pinned.
 32. **Tests for the edges, a doctor, real drags**: a brand-new profile's first run and restart, the empty states; `doctor.sh`, which checks the whole setup; `tests/drag_tests.py`, ten real drag-and-drop cases.
 33. **Audit after the move**: "no tab previews while dragging" had never actually been applied (now tested, and every launch checks for any uncaught script error); LibreWolf leftovers, an old data conversion, fallbacks for older Firefox versions and dead CSS removed; new screenshots.
+34. **Peek with the real mouse**: three real-click cases in the drag tests; a loop that kept forcing the page under a loading Peek to draw is gone (filmed with and without it: no difference). A dragged tile no longer shrinks to a tab's height (Firefox lifts it out of the grid that sized it); the drag test now measures it mid-drag.
 
 Plans, things to watch and known limitations: see [TODO.md](TODO.md).
 
