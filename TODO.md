@@ -12,29 +12,37 @@ Nothing queued.
 
 ## Bigger projects
 
+Nothing queued.
+
+## To watch
+- The first Firefox update with automatic updates on (159): the reinstall should happen by itself and `doctor.sh` come back clean. Right after the very first install into Firefox.app, Firefox's first launch once restarted itself without its arguments (on the default profile); not seen since, but each reinstall changes the app again.
 
 ## Known limitations
 - Apple guidelines, not done: the pinned page dot can't take keyboard focus (its action is in the tab's context menu); the sidebar can't be translucent (Firefox allows no blur behind its own interface); our few labels are English only.
 
 - The auto-hide sidebar is one flat color; themes that shade the pinned sidebar from edge to edge (Nova Ash does, slightly) match it in the middle, within a shade. With the sidebar kept on auto-hide, a wallpaper change is picked up the next time it's pinned (Cmd+S).
 - Multiple windows: if two windows change the sidebar within the same half second, the later save wins. Whether a folder is open or closed stays per window. A change of a tile's icon alone reaches other windows with the next other change.
-- The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's Firefox's own layout.
+- The site-info (shield) panel's text column is slightly uneven (12–17px from the edge); it's Firefox's own layout. (Seen on LibreWolf; not re-checked on Firefox.)
 - The Reddit tile's blank icon during its bot check at launch is handled by refilling the saved icon; this path couldn't be triggered on demand, so it's untested.
-- The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once; the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
-- Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when Firefox quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (Firefox can't split tiles). Peek's Esc was tested with a dispatched key event, the rest with real clicks.
-- Profile switcher: switching and creating profiles were tested with made-up profiles only (Firefox turns its profiles on only for profiles in its profile list, which the test profiles aren't); the layout and fitting were measured.
+- The stale "visually selected" race behind the black tile after Cmd+W was reproduced only once (on LibreWolf); the fix (reset after the tab switch completes, plus clearing a stale mark) is logically complete but not confirmed by a repeat failure.
+- Peek: a link opened in the background (Cmd+click) is a normal background tab, not a Peek. A Peek left open when Firefox quits comes back as a normal tab. Split View from a Peek isn't offered over a tile (Firefox can't split tiles). Peek is tested with dispatched events and clicks from the test script; no real-mouse case yet.
+- Profile switcher: the tests use made-up profiles (Firefox turns its profiles on only for profiles in its profile list, which test profiles aren't); switching and creating real profiles was tried by hand.
 - Tiles can't be split (Firefox keeps its pinned tabs out of split views). Dropping a tab onto another tab in the sidebar still reorders, as before.
-- Dragging a tab in from another window is tested with simulated events only. Real drags are checked by `tests/drag_tests.py` (it needs `~/.arc-drag/drag`, outside the repo).
-- When a tab leaves the tiles mid-drag, Firefox sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble.
+- Dragging a tab in from another window is tested with simulated events only. Real drags within a window are checked by `tests/drag_tests.py`.
+- When a tab leaves the tiles mid-drag, Firefox sizes the gap for a tile-shaped tab (44px) for about 0.1s before using the row's 36px: a brief wobble. (Seen before the first-tile slot work; not re-checked.)
 - A folder folds up while it's dragged (Firefox's design); the rows above close up and its space waits above the divider until the drop.
 - Firefox's internal `moveTabToSplitView` can make a 3-page split; no menu or gesture does that.
-- `restoreRows` still converts rows saved by an early version (when rows were Firefox pinned tabs); it doubles as crash recovery, so it stays.
+- Extension buttons pinned to the toolbar aren't shown (the toolbar row keeps only back, forward and reload): extensions, iCloud Passwords included, are in the Extensions menu at the bottom right of the sidebar.
+- Automatic reinstalls (`autoupdate/`) open Terminal, which needs the App Management permission to write into Firefox.app.
+- `doctor.sh` can check profiles only from a Terminal with Full Disk Access (macOS keeps other apps out of Firefox's folder).
+- `tests/drag_tests.py` needs `~/.arc-drag/drag`, a small tool outside the repo.
 
 ## Animation ideas
 - Left alone on purpose: switching tabs and hover stay instant / near-instant; page loading and the Downloads progress are Firefox's own.
 
 ## Done
 
+- [x] Audit and cleanup after the move: "no tab previews while dragging" had never been applied (an unreachable function; now tested, and every launch checks for any uncaught script error); a misspelled focus-colour variable; the test runner's silent relaunch (it hid failures); orphaned test browsers; doctor and installer fixes; `betterfox/update.sh` checks what it fetches; LibreWolf leftovers (`sidebar.revamp`, comments, `.gitignore`), an old data conversion, fallbacks for older Firefox and dead CSS removed. `::part()` from userChrome.css was re-checked on Firefox: still ignored, so the tile grid style stays injected.
 - [x] `tests/drag_tests.py`: ten real drag-and-drop cases with the real mouse (through `~/.arc-drag/drag`), each checked for where things land and for leftovers (torn-off windows, drag state, offsets, errors, saved state).
 - [x] `doctor.sh`: checks the whole setup in one go (installed files against the repo, restart needed, profiles' chrome link and user.js, automatic updates, iCloud Passwords, uncommitted Betterfox updates) and says how to fix each problem.
 - [x] Tests for empty and unusual states: a brand-new profile's first run and restart, nothing pinned, tiles only, rows only, a scrambled toolbar. Fixed along the way: the divider sat 12px too low with no rows (and was clipped away with tiles only); with nothing pinned there's no divider now.

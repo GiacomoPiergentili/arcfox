@@ -35,9 +35,13 @@
       // a tab in a collapsed folder loading or unloading shows or hides it:
       // Firefox's list of shown tabs must hear about it
       guard("folders: loaded tabs stay in view", () => {
+        // (a rename in a Firefox update is reported here, at set-up)
+        if (typeof gBrowser.tabContainer._invalidateCachedVisibleTabs !== "function") {
+          throw new Error("Firefox's _invalidateCachedVisibleTabs isn't there any more");
+        }
         new win.MutationObserver(records => {
           if (records.some(r => r.target.group?.collapsed)) {
-            gBrowser.tabContainer._invalidateCachedVisibleTabs?.();
+            gBrowser.tabContainer._invalidateCachedVisibleTabs();
           }
         }).observe(gBrowser.tabContainer, { attributes: true, attributeFilter: ["pending"], subtree: true });
       });

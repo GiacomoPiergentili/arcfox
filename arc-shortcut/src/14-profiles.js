@@ -19,7 +19,8 @@
         // in a narrow sidebar
         const maxProfiles = () => {
           const width = doc.querySelector("sidebar-main")?.getBoundingClientRect().width || 273;
-          // Downloads ends 43px in, Extensions starts 42px from the end
+          // Downloads ends 43px in, Extensions starts 42px from the end: the
+          // wider side plus the 4px gap on both, as they're centered
           const room = width - 2 * 47;
           return Math.max(1, Math.floor((room + 4) / 34));
         };

@@ -37,8 +37,9 @@ try {
       } catch {}
     };
     // Dragging a tab onto another one reorders it (as in Arc) instead of
-    // pausing to create a tab group. (Defaults the script relies on are set
-    // here, so they come with it and need no pref file of their own.)
+    // pausing to create a tab group. (Defaults the script's own behaviour
+    // relies on are set here, so they come and go with it; the browser-wide
+    // ones, like vertical tabs, are in betterfox/overrides.js.)
     const defaults = Cc["@mozilla.org/preferences-service;1"]
       .getService(Ci.nsIPrefService)
       .getDefaultBranch("");
@@ -253,7 +254,6 @@ try {
           setIfDefault("browser.startup.homepage", "chrome://browser/content/blanktab.html"); // launch: the empty page with the command bar
           setIfDefault("browser.newtabpage.enabled", false);
           setIfDefault("sidebar.verticalTabs.dragToPinPromo.dismissed", true); // (a card in the tiles' place)
-          setIfDefault("sidebar.new-sidebar.has-used", true);
           // The toolbar buttons the layout places (back, forward and reload
           // at the top, Downloads and Extensions in the bottom row): a new
           // Firefox profile with vertical tabs leaves reload and Downloads out
@@ -292,7 +292,7 @@ try {
                 proc.init(ln);
                 proc.run(true, ["-s", ARC_CHROME_DIR, chrome.path], 3);
               }
-              for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+              for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.verticalTabs"]) {
                 prefs.setBoolPref(name, true);
               }
               win.setTimeout(() => {
@@ -338,15 +338,15 @@ try {
         verticalTabsKept = true;
         const userJs = win.Services.dirsvc.get("ProfD", Ci.nsIFile);
         userJs.append("user.js");
-        const lines = ['user_pref("sidebar.revamp", true);', 'user_pref("sidebar.verticalTabs", true);'];
+        // (the new sidebar, sidebar.revamp, is on by default)
+        const line = 'user_pref("sidebar.verticalTabs", true);';
         win.IOUtils.readUTF8(userJs.path).catch(() => "").then(text => {
-          const missing = lines.filter(line => !text.includes(line));
-          if (missing.length) {
+          if (!text.includes(line)) {
             const start = text && !text.endsWith("\n") ? "\n" : "";
             return win.IOUtils.writeUTF8(userJs.path, text + start +
               "// arcfox: the Arc sidebar is built on vertical tabs (kept on even if a\n" +
               "// Firefox update removes arc-shortcut/install.sh's files from the app)\n" +
-              missing.join("\n") + "\n");
+              line + "\n");
           }
           return undefined;
         }).catch(e => report("vertical tabs kept on", e));

@@ -52,7 +52,11 @@ elif [[ -f "$RES/defaults/pref/betterfox.js" ]]; then
 else
   bad "Betterfox's defaults aren't installed" "$INSTALL"
 fi
-pid=$(pgrep -f "$APP/Contents/MacOS/firefox" | head -1)
+# (your Firefox, not a test browser: those run throwaway arcfox-* profiles)
+pid=""
+for p in $(pgrep -f "$APP/Contents/MacOS/firefox$|$APP/Contents/MacOS/firefox "); do
+  ps -o command= -p $p | grep -q -- "-profile .*arcfox-" || { pid=$p; break; }
+done
 if [[ -n "$pid" ]]; then
   started=$(date -j -f "%a %b %d %T %Y" "$(ps -o lstart= -p $pid)" +%s 2>/dev/null)
   installed=$(stat -f %m "$RES/firefox.cfg" 2>/dev/null || echo 0)
@@ -97,8 +101,8 @@ if launchctl print "gui/$UID/$LABEL" >/dev/null 2>&1; then
   else
     bad "on, but running a check.sh from another folder" "run $REPO/autoupdate/setup.sh"
   fi
-  code=$(launchctl print "gui/$UID/$LABEL" | awk '/last exit code/{print $NF; exit}')
-  [[ -n "$code" && "$code" != "0" && "$code" != "(never" ]] && warn "its last run ended with code $code" "see $LOG"
+  code=$(launchctl print "gui/$UID/$LABEL" | awk '/last exit code/ && !/never/{print $NF; exit}')
+  [[ -n "$code" && "$code" != "0" ]] && warn "its last run ended with code $code" "see $LOG"
   if [[ -f "$LOG" ]]; then
     recent=$(grep -E "failed|refused" "$LOG" | tail -1)
     [[ -n "$recent" ]] && warn "last problem in its log: ${recent}" "see $LOG"
@@ -124,7 +128,7 @@ if [[ -z "$pid" ]]; then
 elif [[ -n "$connected" ]]; then
   ok "Apple's helper is running for Firefox (iCloud Passwords connected)"
 else
-  warn "Apple's helper isn't running for Firefox" "click the iCloud Passwords button in Firefox to connect"
+  warn "Apple's helper isn't running for Firefox" "in Firefox, open the Extensions menu (bottom right of the sidebar) and click iCloud Passwords to connect"
 fi
 # (the log doesn't say which app the helper was refused for: only recent ones)
 if /usr/bin/log show --last 30m --predicate 'eventMessage CONTAINS "Launch Constraint Violation" AND eventMessage CONTAINS "PasswordManager"' 2>/dev/null | grep -q "AMFI"; then

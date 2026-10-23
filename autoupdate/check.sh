@@ -5,9 +5,9 @@
 #    (install.sh, in Terminal: macOS lets only apps with App Management write
 #    into Firefox.app) and asks for a restart. Edits to the repo alone never
 #    trigger a reinstall: run install.sh yourself when they're ready.
-#  - Once a day: fetches Betterfox; if it changed (and is only user_pref
-#    lines), updates betterfox/user.js (left uncommitted, see git diff) and
-#    reinstalls Betterfox's defaults.
+#  - Once a day: betterfox/update.sh fetches Betterfox; if it changed (and is
+#    only prefs and comments), betterfox/user.js is updated (left
+#    uncommitted, see git diff) and Betterfox's defaults reinstalled.
 REPO="${0:A:h:h}"
 RES=/Applications/Firefox.app/Contents/Resources
 STATE="$HOME/Library/Application Support/arcfox-autoupdate"
@@ -41,26 +41,18 @@ if ! grep -q ">>> ARC SIDEBAR SHORTCUT >>>" "$RES/firefox.cfg" 2>/dev/null || [[
   fi
 fi
 
-# --- Betterfox, once a day
+# --- Betterfox, once a day (betterfox/update.sh fetches and checks it)
 if [[ -z $(find "$STATE/betterfox-checked" -mtime -1 2>/dev/null) ]]; then
-  NEW=$(mktemp)
-  if curl -fsSL --max-time 30 https://raw.githubusercontent.com/yokoffing/Betterfox/main/user.js | tr -d '\r' > "$NEW" && [[ -s "$NEW" ]]; then
-    touch "$STATE/betterfox-checked"
-    if ! cmp -s "$NEW" "$REPO/betterfox/user.js"; then
-      # (only prefs and comments; nothing that could load code)
-      BAD=$(grep -v -E '^\s*$|^\s*(//|/\*|\*)|^user_pref\("[A-Za-z0-9._-]+", .*\);\s*(//.*)?$' "$NEW" | head -3)
-      if [[ -n "$BAD" ]] || grep -q -E 'general\.config|autoadmin' "$NEW"; then
-        log "Betterfox update refused (unexpected lines): $BAD"
-        notify "A Betterfox update looked unusual and wasn't installed: see ~/Library/Logs/arcfox-autoupdate.log"
-      else
-        cp "$NEW" "$REPO/betterfox/user.js"
-        log "Betterfox updated to $(grep -m1 -o 'version: [0-9.]*' "$NEW"): installing"
-        open -a Terminal "$REPO/autoupdate/install-betterfox.command"
-        notify "Betterfox updated ($(grep -m1 -o 'version: [0-9.]*' "$NEW")). Restart Firefox to use it."
-      fi
-    fi
-  else
-    log "Betterfox check failed (offline?)"
-  fi
-  rm -f "$NEW"
+  out=$("$REPO/betterfox/update.sh")
+  case $? in
+    0) touch "$STATE/betterfox-checked"
+       log "Betterfox $out: installing"
+       open -a Terminal "$REPO/autoupdate/install-betterfox.command"
+       notify "Betterfox $out. Restart Firefox to use it." ;;
+    2) touch "$STATE/betterfox-checked"
+       log "Betterfox update $out"
+       notify "A Betterfox update looked unusual and wasn't installed: see ~/Library/Logs/arcfox-autoupdate.log" ;;
+    3) touch "$STATE/betterfox-checked" ;;
+    *) log "Betterfox check failed: $out" ;;
+  esac
 fi

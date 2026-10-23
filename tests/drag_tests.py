@@ -10,17 +10,17 @@ script errors, and the saved tiles and rows matching the sidebar.
 
 The mouse moves only through ~/.arc-drag/drag, which refuses unless the
 test window is frontmost and on top at every point. Don't touch the mouse
-or keyboard while it runs (about 2 minutes); not run by run_tests.py.
+or keyboard while it runs (about 2½ minutes); not run by run_tests.py.
 
     python3 tests/drag_tests.py                  # all cases
     python3 tests/drag_tests.py --only folder    # cases whose name has "folder"
     python3 tests/drag_tests.py --record <dir>   # also film each drag (the
                                                  # test window only; needs
                                                  # Screen Recording)
+    python3 tests/drag_tests.py --user-js <file> # on top of a user.js
 
 Needs the script installed (arc-shortcut/install.sh). Exit code 1 on any failure.
 """
-import json
 import os
 import shutil
 import subprocess
@@ -131,12 +131,12 @@ check(!document.getElementById("pinned-drop-indicator").hasAttribute("visible"),
 INVARIANTS = r"""
 check([...Services.wm.getEnumerator("navigator:browser")].length === 1, "no window torn off");
 check(!gBrowser.tabContainer.querySelector("[dragtarget], [arc-make-room]"), "no drag marks left on tabs");
-const leftover = ["arc-dragging", "arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-folder-drag"].filter(a => root.hasAttribute(a));
+const leftover = ["arc-dragging", "arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-folder-drag", "arc-snap-row", "arc-snap-tile"].filter(a => root.hasAttribute(a));
 check(!leftover.length, "no drag state left on the window: " + leftover);
 const moved = gBrowser.tabs.filter(t => (t.style.transform && t.style.transform !== "none") || t.style.translate);
 check(!moved.length, "no tab left offset: " + moved.map(t => t.label));
-const errs = Services.console.getMessageArray().slice(window.__arcConsoleMark || 0).map(m => m.message || "").filter(m => /^Arc sidebar/.test(m));
-check(!errs.length, "no script errors: " + errs.map(m => m.split("\n")[0]).join(" | "));
+const errs = scriptErrors().slice(window.__arcErrorMark || 0);
+check(!errs.length, "no script errors: " + errs.join(" | "));
 check(JSON.parse(Services.prefs.getStringPref("arc.tiles", "[]")).length === tiles().length, "the saved tiles match the sidebar");
 const savedRows = Services.prefs.getStringPref("arc.pinnedRows", "[]");
 check(rows().every(r => savedRows.includes(r.getAttribute("arc-id"))), "every row is saved");
@@ -172,6 +172,13 @@ def main():
     results = []
     try:
         proc, mn = T.launch(profile)
+        # (nothing to test without the script: say so once, not in every case)
+        res = mn.js(T.TESTS[0][1])
+        if not res["ok"]:
+            print("FAIL  " + T.TESTS[0][0])
+            for f in res["fail"]:
+                print("        - " + f)
+            sys.exit(1)
         for name, setup, expect in cases:
             start = time.time()
             fails = []
@@ -179,7 +186,7 @@ def main():
                 res = mn.js(T.SETUP)
                 if not res["ok"]:
                     raise RuntimeError("layout set-up failed: %s" % res["fail"])
-                points = mn.js(PRELUDE + "window.__arcConsoleMark = Services.console.getMessageArray().length;\n" + setup)
+                points = mn.js(PRELUDE + "window.__arcErrorMark = scriptErrors().length;\n" + setup)
                 frontmost(proc.pid)
                 rec = None
                 if record:
@@ -204,6 +211,7 @@ def main():
                 print("        - " + f)
         T.quit(proc, mn)
     finally:
+        T.close_all()
         shutil.rmtree(profile, ignore_errors=True)
     failed = [n for n, ok in results if not ok]
     print("\n%d passed, %d failed" % (len(results) - len(failed), len(failed)))

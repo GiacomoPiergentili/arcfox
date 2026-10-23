@@ -27,7 +27,7 @@
           .filter(el => el && el.getBoundingClientRect().height > 0);
       const itemOf = el => (el.localName === "tab" ? el : el.closest("tab-group"));
       const inBlockEl = el => (el.localName === "tab" ? isRow(el) : true);
-      const tilesBox = () => (gBrowser.tabContainer.pinnedTabsContainer || doc.getElementById("pinned-tabs-container"))?.getBoundingClientRect();
+      const tilesBox = () => gBrowser.tabContainer.pinnedTabsContainer.getBoundingClientRect();
       const isOverTiles = (y, r = tilesBox()) => !!r && r.height > 0 && y >= r.top && y <= r.bottom + 4;
       // Would a drop at this height make a pinned row?
       const headsForRow = y => !isOverTiles(y) && dividerY !== null && y < dividerY;
@@ -50,7 +50,7 @@
       };
       // ...and while it's over them, the tiles from that place on slide one
       // cell along to make room (the grid grows a line if it has to)
-      const tilesContainer = () => gBrowser.tabContainer.pinnedTabsContainer || doc.getElementById("pinned-tabs-container");
+      const tilesContainer = () => gBrowser.tabContainer.pinnedTabsContainer;
       let tileGap = -1;
       const openTileGap = index => {
         if (index === tileGap) {
@@ -108,7 +108,7 @@
         }
       };
       guard("drag and drop: tiles", () => {
-        // Place it in the same frame Firefox unpins it, so it never shows up
+        // Place it in the same frame Firefox pins it, so it never shows up
         // at the top first
         gBrowser.tabContainer.addEventListener("TabPinned", e => {
           const drop = pendingDrop;
@@ -284,6 +284,20 @@
         }
         return dragged.multiselected ? [...gBrowser.selectedTabs] : [dragged];
       };
+      // ...and the dragged tab, a tile's shape over it, sits in the slot
+      // ([arc-snap-tile] + --arc-slot-dy) instead of where Firefox holds it
+      const snapToSlot = on => {
+        const dragged = gBrowser.tabContainer.querySelector(".tabbrowser-tab[dragtarget]:not([pinned])");
+        const snap = on && !!dragged;
+        dragRoot.toggleAttribute("arc-snap-tile", snap);
+        if (snap) {
+          const current = parseFloat(dragRoot.style.getPropertyValue("--arc-slot-dy")) || 0;
+          const bg = dragged.querySelector(".tab-background").getBoundingClientRect();
+          dragRoot.style.setProperty("--arc-slot-dy", `${firstTileSlot.getBoundingClientRect().top - (bg.top - current)}px`);
+        } else {
+          dragRoot.style.removeProperty("--arc-slot-dy");
+        }
+      };
       guard("drag and drop: the first tile", () => {
         if (!firstTileSlot) {
           throw new Error("Firefox's pin drop zone isn't there any more");
@@ -305,10 +319,15 @@
               dragRoot.style.setProperty("--arc-drag-x", `${e.clientX - tilesBox().left}px`);
             }
             dragRoot.toggleAttribute("arc-drag-over-tiles", over);
+            // (and the rows stay put, as when it's over the tiles)
+            dragRoot.toggleAttribute("arc-tab-over-tiles", over);
+            snapToSlot(over);
           }, true);
           zone?.addEventListener("dragleave", e => {
             if (!zone.contains(e.relatedTarget)) {
               dragRoot.removeAttribute("arc-drag-over-tiles");
+              dragRoot.removeAttribute("arc-tab-over-tiles");
+              snapToSlot(false);
             }
           });
           zone?.addEventListener("drop", e => {
@@ -420,9 +439,16 @@
           } else {
             dragRoot.style.removeProperty("--arc-snap-dy");
           }
+          snapToSlot(!!draggedTabs(e) && onFirstTileSlot(e));
         }, true);
       });
       let quietPreviewsUntil = 0;
+      // Tab preview cards: none while dragging, nor right after a drop (the
+      // pointer comes to rest on a tab). (Replaces the panel's shouldActivate,
+      // see the list at the end.)
+      const noPreviewsWhileDragging = original => function () {
+        return !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && original.call(this);
+      };
       const endDrag = () => {
         quietPreviewsUntil = win.performance.now() + 1000;
         closeTileGap();
@@ -436,6 +462,8 @@
         dragRoot.removeAttribute("arc-dragging");
         dragRoot.removeAttribute("arc-snap-row");
         dragRoot.style.removeProperty("--arc-snap-dy");
+        dragRoot.removeAttribute("arc-snap-tile");
+        dragRoot.style.removeProperty("--arc-slot-dy");
         listEndScreenY = null;
         dragRoot.style.removeProperty("--arc-row-dx");
         for (const el of gBrowser.tabContainer.querySelectorAll("[arc-make-room]")) {
@@ -446,11 +474,6 @@
       };
       guard("drag and drop: ending", () => {
         gBrowser.tabContainer.addEventListener("dragend", endDrag, true);
-        // Tab preview cards: none while dragging, nor right after a drop (the
-        // pointer comes to rest on a tab)
-        const noPreviewsWhileDragging = original => function () {
-          return !dragRoot.hasAttribute("arc-dragging") && win.performance.now() > quietPreviewsUntil && original.call(this);
-        };
         gBrowser.tabContainer.addEventListener("drop", endDrag, true);
         // Leaving the sidebar doesn't end the drag (it may come back, e.g.
         // after a detour over the page): only the cues that follow the pointer
@@ -458,7 +481,7 @@
         gBrowser.tabContainer.addEventListener("dragleave", e => {
           if (!gBrowser.tabContainer.contains(e.relatedTarget)) {
             closeTileGap();
-            for (const name of ["arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-snap-row"]) {
+            for (const name of ["arc-drop-row", "arc-drag-over-tiles", "arc-tab-over-tiles", "arc-drag-over-rows", "arc-snap-row", "arc-snap-tile"]) {
               dragRoot.removeAttribute(name);
             }
             for (const el of gBrowser.tabContainer.querySelectorAll("[arc-make-room]")) {

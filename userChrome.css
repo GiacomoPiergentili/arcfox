@@ -56,7 +56,7 @@
 
   /* Fields (URL bar, find bar, ...) */
   --toolbar-field-background-color: var(--arc-field) !important;
-  --toolbar-field-focus-background-color: var(--arc-field-focus) !important;
+  --toolbar-field-background-color-focus: var(--arc-field-focus) !important;
   --toolbar-field-border-color: transparent !important;
   --toolbar-field-border-color-focus: var(--arc-focus-ring) !important;
 }
@@ -101,13 +101,10 @@
 
 /* Resize handles (below the pinned tabs, above the sidebar's bottom
    buttons): macOS dividers show only the resize cursor, not a colored bar.
-   The second one is inside a component and paints its hover with
+   The first one is styled below ("The resize handle below the tiles"). The
+   second one is inside a component and paints its hover with
    --focus-outline-color, so that variable is cleared for the sidebar and
    restored for the tabs. */
-#vertical-pinned-tabs-splitter:hover {
-  background-color: transparent !important;
-}
-
 sidebar-main {
   --focus-outline-color: transparent !important;
   /* The sidebar's contents fill it. Until its edge is dragged once,
@@ -432,10 +429,11 @@ sidebar-main {
 
 /* No rows: nothing for the line to measure from above, so it measures from
    the tiles (8px, the line, 8px from their edge; under them come their half
-   gap, a 1px margin and Firefox's 9px splitter). With nothing pinned at all
-   there's nothing to divide: no line, and + New Tab sits 16px under the URL
-   bar, as the tiles would (the tab list starts 12px under it). The line still
-   shows as the cue while a drag would make the first row ([arc-drop-row]). */
+   gap, a 1px margin and Firefox's splitter, 4px plus our 5px margin). With
+   nothing pinned at all there's nothing to divide: no line, and + New Tab
+   sits 16px under the URL bar, as the tiles would (the tab list starts 12px
+   under it). The line still shows as the cue while a drag would make the
+   first row ([arc-drop-row]). */
 #tabbrowser-tabs[orient="vertical"]:not(:has(:is(.tabbrowser-tab[arc-pinned-row], tab-group))) #tabbrowser-arrowscrollbox-periphery {
   margin-top: calc(17px - var(--arc-tile-gap) / 2 - 1px - 9px) !important;
 }
@@ -541,12 +539,6 @@ sidebar-main {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #tabbrowser-tabs[orient="vertical"] > #pinned-drop-indicator {
-    transition: none !important;
-  }
-}
-
 /* A folder being dragged: the script holds its space above + New Tab, so
    the normal tabs below it stay put without Firefox's own offset (which
    would push them down a second time) */
@@ -576,6 +568,12 @@ sidebar-main {
   width: var(--arc-row-w) !important;
   max-width: none !important;
   padding-block: 0 !important;
+}
+
+/* With no tiles yet: the dragged tab, a tile's shape, in the first tile's
+   slot ([arc-snap-tile] and --arc-slot-dy from the script) */
+:root[arc-snap-tile] #tabbrowser-tabs[orient="vertical"] .tabbrowser-tab[dragtarget]:not([pinned]) {
+  translate: 0 var(--arc-slot-dy, 0px) !important;
 }
 
 /* The dragged tab's extra offsets: into the row column (a tile, see above)
@@ -789,7 +787,7 @@ sidebar-main {
 #tabs-newtab-button {
   border-radius: var(--arc-radius-inner) !important;
   /* a row like the tabs: their text color, not the toolbar buttons' (some
-     themes tint those, e.g. in purple) */
+     themes tint those) */
   color: var(--tab-text-color) !important;
 
   > .toolbarbutton-icon {
@@ -931,7 +929,7 @@ sidebar-main {
 /* Keep only back, forward and reload in the button row, at its right end
    (the URL bar lives in this list too, positioned below; downloads and
    extensions move to the sidebar's bottom row) */
-#nav-bar-customization-target > :not(#back-button, #forward-button, #stop-reload-button, #reload-button, #stop-button, #downloads-button, #unified-extensions-button, #urlbar-container, #arc-profiles) {
+#nav-bar-customization-target > :not(#back-button, #forward-button, #stop-reload-button, #downloads-button, #unified-extensions-button, #urlbar-container, #arc-profiles) {
   display: none !important;
 }
 
@@ -951,8 +949,9 @@ sidebar-main {
 
 /* Downloads at the left end (its icon in line with the tab icons),
    Extensions at the right, the profile switcher between them. Firefox
-   builds Downloads hidden and shows it only after the window is up (it
-   never auto-hides it), so it popped in late at launch: always shown. */
+   builds Downloads hidden and shows it only after the window is up (the
+   script keeps it from auto-hiding: browser.download.autohideButton), so it
+   popped in late at launch: always shown. */
 #downloads-button {
   left: 13px !important;
   right: auto !important;
@@ -1255,10 +1254,8 @@ panel toolbarseparator {
     /* Spotlight-like solid panel with the same accent focus ring as the
        sidebar bar, and icons scaled up to match the larger text */
     --toolbar-field-background-color: var(--arc-panel);
-    --toolbar-field-focus-background-color: var(--arc-panel);
+    --toolbar-field-background-color-focus: var(--arc-panel);
     --urlbar-background-color: var(--arc-panel);
-    --urlbar-background-color-focus: var(--arc-panel);
-    --toolbar-field-border-color: transparent;
     --icon-size: var(--arc-spotlight-icon-size);
     font-size: var(--arc-spotlight-font-size) !important;
   }
@@ -1425,8 +1422,8 @@ panel toolbarseparator {
    reach (no native material can be applied to an element), and Firefox
    paints the floating one near-black. The shortcut script measures the
    pinned sidebar (on theme, appearance and wallpaper changes) into
-   --arc-sidebar-dark / --arc-sidebar-light; until then, the values measured
-   with the Nova Ash theme. */
+   --arc-sidebar-dark / --arc-sidebar-light; until then (a profile's first
+   launch), the values of the Nova Ash theme it was designed with. */
 :root {
   --arc-hover-panel-bg: light-dark(var(--arc-sidebar-light, rgb(250, 249, 253)), var(--arc-sidebar-dark, rgb(60, 59, 63)));
 }
@@ -1681,7 +1678,7 @@ split-view-footer {
    stronger inset fill (concentric corners) on the page that has the focus,
    and a hairline between the two halves when neither stands out. */
 #tabbrowser-tabs[orient="vertical"] tab-split-view-wrapper {
-  margin: calc(var(--arc-tab-gap) / 2) var(--arc-split-inset, 4px) !important;
+  margin: calc(var(--arc-tab-gap) / 2) 4px !important;
   padding: 0 !important;
   border-radius: var(--arc-radius-inner) !important;
   outline: none !important;
@@ -1755,7 +1752,6 @@ split-view-footer {
 
 /* In a folder: indented like its rows, with the folder's line */
 #tabbrowser-tabs[orient="vertical"] tab-group > tab-split-view-wrapper {
-  --arc-split-inset: 4px;
   margin-inline-start: 12px !important;
 
   &::before {

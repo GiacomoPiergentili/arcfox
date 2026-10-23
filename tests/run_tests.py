@@ -4,15 +4,20 @@
 Launches Firefox with a fresh, throwaway profile that uses this repo's
 userChrome.css, drives it through Marionette (Firefox's built-in remote
 control) and checks the key behaviors: layout and spacing, tile colors, the
-Cmd+T bar, shortcuts, closing rules, auto-hide tiles, the sidebar color
-measurement, rows and folders across a restart, and auto-archive.
+Cmd+T bar, shortcuts, closing rules, split view, Peek, the profile switcher,
+folders, motion, the Apple guidelines checks, auto-hide, the sidebar color
+measurement, the toolbar order, the first tile, tab previews, rows and
+folders across a restart, auto-archive, several windows. Then a brand-new
+profile without the look (its first run, its restart) and the empty states
+in it. Each launch ends with a check that the script logged no errors.
 
 Requirements: Firefox in /Applications and the script installed into it
 (arc-shortcut/install.sh). Nothing else: Python 3 standard library only.
-Your own profile is never touched; the test profile is deleted afterwards.
+Your own profile is never touched; the test profiles are deleted afterwards.
+Real drag and drop is in tests/drag_tests.py.
 
-    python3 tests/run_tests.py            # all tests, about 2 minutes
-    python3 tests/run_tests.py --keep     # keep the test profile (prints its path)
+    python3 tests/run_tests.py            # all tests, about 4 minutes
+    python3 tests/run_tests.py --keep     # keep the test profiles (prints their paths)
     python3 tests/run_tests.py --user-js path/to/user.js
                                           # on top of a user.js (e.g. Betterfox's)
 
@@ -33,12 +38,11 @@ PORT = 2839  # its own port, so it never talks to another Firefox
 
 # (what a profile needs for the look; the script turns them on itself in a
 # new profile)
-LOOK_PREFS = ("toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs")
+LOOK_PREFS = ("toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.verticalTabs")
 
 PREFS = {
     "marionette.port": PORT,
     "toolkit.legacyUserProfileCustomizations.stylesheets": True,
-    "sidebar.revamp": True,
     "sidebar.verticalTabs": True,
     "sidebar.visibility": "always-show",
     "browser.shell.checkDefaultBrowser": False,
@@ -46,7 +50,7 @@ PREFS = {
     "browser.tabs.warnOnClose": False,
     "browser.translations.automaticallyPopup": False,
     "datareporting.policy.dataSubmissionEnabled": False,
-    # (Firefox's first-run pages and prompts, which LibreWolf doesn't have)
+    # (no first-run pages, prompts, updates or experiments in a test run)
     "browser.startup.homepage_override.mstone": "ignore",
     "startup.homepage_welcome_url": "",
     "startup.homepage_welcome_url.additional": "",
@@ -125,6 +129,11 @@ const newTabKey = () => document.getElementById("key_newNavigatorTab").doCommand
 const fail = [];
 const check = (cond, what) => { if (!cond) fail.push(what); };
 const result = info => ({ok: fail.length === 0, fail, info});
+// Errors from the script: its own reports ("Arc sidebar (...)") and anything
+// thrown in firefox.cfg that it didn't catch (e.g. in an event listener)
+const scriptErrors = () => Services.console.getMessageArray().filter(m =>
+  /^Arc sidebar/.test(m.message || "") || (m instanceof Ci.nsIScriptError && /firefox\.cfg/.test(m.sourceName || "")))
+  .map(m => (m.message || m.errorMessage || "").split("\n")[0] + (m.sourceName ? " (" + m.sourceName.split("/").pop() + ":" + m.lineNumber + ")" : ""));
 """
 
 
@@ -151,6 +160,7 @@ return result({tabs: gBrowser.tabs.map(t => (t.pinned ? "tile:" : isRow(t) ? "ro
 
 TESTS = [
     ("script is installed and running", r"""
+check(!!getComputedStyle(root).getPropertyValue("--arc-tab-height"), "userChrome.css loaded");
 check(root.hasAttribute("arc-script"), "the window isn't marked [arc-script]: run arc-shortcut/install.sh");
 const notSetUp = Services.console.getMessageArray().map(m => m.message || "").filter(m => /^Arc sidebar \(.*: not set up\)/.test(m));
 check(!notSetUp.length, "every feature set up (none failed): " + notSetUp.map(m => m.split("\n")[0]).join(" | "));
@@ -595,12 +605,31 @@ check(tiles().map(t => t.label).join() === before.map(t => t.label).join(), "(ti
 return result({});
 """),
 
+    ("no tab previews while dragging", r"""
+// (Firefox makes the preview panel on the first hover; the script hooks in then)
+gBrowser.tabContainer.ensureTabPreviewPanelLoaded();
+gBrowser.tabs.find(t => !t.pinned)?.dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+await wait(300);
+const panel = gBrowser.tabContainer.previewPanel;
+root.setAttribute("arc-dragging", "");
+const during = panel.shouldActivate();
+root.removeAttribute("arc-dragging");
+check(during === false, "no preview card while a tab is dragged");
+return result({});
+"""),
+
     ("vertical tabs kept on: the profile's user.js (1/2)", r"""
 // (the next launch puts them back, see after the restart)
 const path = PathUtils.join(PathUtils.profileDir, "user.js");
 const text = await IOUtils.readUTF8(path);
 check(/user_pref\("sidebar\.verticalTabs", true\);/.test(text), "a profile's user.js turns vertical tabs on");
 await IOUtils.writeUTF8(path, text.split("\n").filter(l => !/"sidebar\.(verticalTabs|revamp)"/.test(l)).join("\n"));
+return result({});
+"""),
+
+    ("no script errors (this launch)", r"""
+const errs = scriptErrors();
+check(!errs.length, "none logged: " + errs.slice(0, 5).join(" | "));
 return result({});
 """),
 ]
@@ -610,7 +639,7 @@ AFTER_RESTART = [
     ("vertical tabs kept on: the profile's user.js (2/2)", r"""
 await wait(500);
 const text = await IOUtils.readUTF8(PathUtils.join(PathUtils.profileDir, "user.js"));
-check(text.includes('user_pref("sidebar.verticalTabs", true);') && text.includes('user_pref("sidebar.revamp", true);'), "taken out, they're back after a launch");
+check(text.includes('user_pref("sidebar.verticalTabs", true);'), "taken out, it's back after a launch");
 check(text.includes('"marionette.port"'), "the rest of user.js is kept");
 return result({});
 """),
@@ -690,6 +719,12 @@ check(pw.gBrowser.tabs.filter(x => x.pinned || x.hasAttribute("arc-pinned-row"))
 pw.close(); await wait(500);
 return result({});
 """),
+
+    ("no script errors (this launch)", r"""
+const errs = scriptErrors();
+check(!errs.length, "none logged: " + errs.slice(0, 5).join(" | "));
+return result({});
+"""),
 ]
 
 
@@ -701,7 +736,7 @@ await wait(2500);
 const chrome = Services.dirsvc.get("UChrm", Ci.nsIFile);
 check(chrome.exists() && chrome.isSymlink(), "its chrome folder is now a link");
 check(chrome.isSymlink() && chrome.target === "__REPO_PLACEHOLDER__", "...to this repo: " + (chrome.isSymlink() ? chrome.target : ""));
-for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.revamp", "sidebar.verticalTabs"]) {
+for (const name of ["toolkit.legacyUserProfileCustomizations.stylesheets", "sidebar.verticalTabs"]) {
   check(Services.prefs.getBoolPref(name, false), name + " is on");
 }
 check(Services.prefs.getBoolPref("arc.profileDefaultsApplied", false), "the layout's settings are applied");
@@ -778,6 +813,12 @@ check(near(lineY - rowsBottom, 8), "8px under the rows: " + (lineY - rowsBottom)
 check(near(R(document.getElementById("tabs-newtab-button")).y - lineY, 9), "9px above + New Tab: " + (R(document.getElementById("tabs-newtab-button")).y - lineY));
 return result({});
 """),
+
+    ("no script errors (this launch)", r"""
+const errs = scriptErrors();
+check(!errs.length, "none logged: " + errs.slice(0, 5).join(" | "));
+return result({});
+"""),
 ]
 
 
@@ -793,11 +834,22 @@ def write_prefs(profile, prefs=None):
             f.write("user_pref(%s, %s);\n" % (json.dumps(key), json.dumps(value)))
 
 
-def launch(profile, attempt=1, needs_look=True):
+# Every test browser started, so none is left running however a run ends
+LAUNCHED = []
+
+
+def close_all():
+    for proc in LAUNCHED:
+        if proc.poll() is None:
+            proc.kill()
+
+
+def launch(profile):
     log = open(os.path.join(profile, "firefox.log"), "w")
     proc = subprocess.Popen([APP, "-profile", profile, "-no-remote", "--marionette",
                              "--remote-allow-system-access", "about:blank"],
                             stdout=log, stderr=subprocess.STDOUT)
+    LAUNCHED.append(proc)
     for _ in range(60):
         try:
             socket.create_connection(("127.0.0.1", PORT), timeout=1).close()
@@ -805,16 +857,7 @@ def launch(profile, attempt=1, needs_look=True):
         except OSError:
             time.sleep(0.5)
     time.sleep(4)
-    mn = Marionette()
-    # A brand-new profile now and then starts without userChrome.css (a
-    # Firefox start-up quirk, not ours): start it again rather than test
-    # without the look
-    loaded = mn.js("return !!getComputedStyle(root).getPropertyValue('--arc-tab-height');")
-    if needs_look and not loaded and attempt < 3:
-        print("(userChrome.css didn't load in the test browser; starting it again)")
-        quit(proc, mn)
-        return launch(profile, attempt + 1)
-    return proc, mn
+    return proc, Marionette()
 
 
 def quit(proc, mn):
@@ -869,14 +912,17 @@ def main():
             # settings that load it): its first run, then empty states
             fresh = tempfile.mkdtemp(prefix="arcfox-test-new-")
             profiles.append(fresh)
+            print("New-profile test profile:", fresh)
             write_prefs(fresh, {k: v for k, v in PREFS.items() if k not in LOOK_PREFS})
-            proc, mn = launch(fresh, needs_look=False)
+            proc, mn = launch(fresh)
             run(mn, [(n, b.replace("__REPO_PLACEHOLDER__", REPO)) for n, b in FIRST_RUN], results)
             quit(proc, mn)
             proc, mn = launch(fresh)
             run(mn, EMPTY, results)
             quit(proc, mn)
     finally:
+        # (never leave a test browser running: it would hold the port)
+        close_all()
         if "--keep" not in sys.argv:
             for p in profiles:
                 shutil.rmtree(p, ignore_errors=True)

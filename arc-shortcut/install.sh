@@ -3,7 +3,7 @@
 # Rerun after every Firefox update, since updates replace the app.
 #   ./install.sh            install
 #   ./install.sh uninstall  remove
-#   ./install.sh betterfox  update Betterfox's defaults only (autoupdate/check.sh)
+#   ./install.sh betterfox  update Betterfox's defaults only (after betterfox/update.sh)
 # Firefox runs an autoconfig file only when a pref file in defaults/pref names
 # it: arc-shortcut-prefs.js does (firefox.cfg) and turns off its sandbox.
 # Betterfox (betterfox/user.js and overrides.js) goes in as Firefox's default
@@ -25,6 +25,7 @@ if [[ ! -d "$RES" ]]; then
 fi
 
 if [[ "$1" == "betterfox" ]]; then
+  mkdir -p "$PREFDIR"
   cat "${HERE:h}/betterfox/user.js" "${HERE:h}/betterfox/overrides.js" | sed 's/^user_pref(/pref(/' > "$PREFDIR/betterfox.js"
   echo "Betterfox updated. Restart Firefox to use it."
   exit 0
@@ -37,6 +38,8 @@ fi
 
 if [[ "$1" == "uninstall" ]]; then
   rm -f "$PREFDIR/arc-shortcut-prefs.js" "$PREFDIR/betterfox.js"
+  # (and the folders, when nothing else is in them: Firefox ships without)
+  rmdir "$PREFDIR" "$RES/defaults" 2>/dev/null || true
   # (the cfg file too, when nothing but its header is left)
   if [[ -f "$CFG" ]] && [[ -z "$(grep -v -x -F -e "$HEADER" -e '' "$CFG")" ]]; then
     rm -f "$CFG"

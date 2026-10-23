@@ -22,11 +22,6 @@
           setAppTab(tab);
         }
         gBrowser.tabContainer.addEventListener("TabBrowserInserted", e => setAppTab(e.target));
-        gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
-          if (e.detail?.changed?.includes(ROW)) {
-            setAppTab(e.target);
-          }
-        });
         new win.MutationObserver(records => {
           for (const r of records) {
             setAppTab(r.target);

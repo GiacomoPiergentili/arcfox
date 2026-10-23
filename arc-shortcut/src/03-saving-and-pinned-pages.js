@@ -309,8 +309,7 @@
       };
       const restoreRows = () => {
         // Tabs that Firefox itself restored with the mark (crash recovery,
-        // session restore; folders come back with them) or that use the old
-        // pinned-row style
+        // session restore; folders come back with them)
         const marked = [...gBrowser.tabs].filter(tab => {
           try {
             return SessionStore.getCustomTabValue(tab, ROW) === "1";
@@ -319,11 +318,8 @@
           }
         });
         if (marked.length) {
-          // keep their original order: unpin all first, then line them up
+          // keep their original order: mark them all first, then line them up
           for (const tab of marked) {
-            if (tab.pinned) {
-              gBrowser.unpinTab(tab);
-            }
             tab.setAttribute(ROW, "");
           }
           // Firefox restores split views too: a row comes back on its own,
@@ -359,12 +355,8 @@
               continue;
             }
             const { id, label, color, collapsed } = entry.folder;
-            let group = null;
-            try {
-              group = gBrowser.addTabGroup(tabs, { id: gBrowser.getTabGroupById?.(id) ? null : id, label, color });
-            } catch {
-              group = gBrowser.addTabGroup(tabs, { label, color });
-            }
+            // (its saved id, unless another folder has it already)
+            const group = gBrowser.addTabGroup(tabs, { id: gBrowser.getTabGroupById(id) ? null : id, label, color });
             if (group) {
               group.setAttribute("arc-folder-id", id || group.id);
               moveToRowBlockEnd(group);
@@ -395,9 +387,9 @@
           });
         }
         // Pinned tabs start on their pinned page (tiles come back from
-        // Firefox's session where they were left). Ones pinned before this
-        // feature take the page they show now.
-        SessionStore.promiseAllWindowsRestored?.then(() => {
+        // Firefox's session where they were left). One without a recorded
+        // pinned page takes the page it shows now.
+        SessionStore.promiseAllWindowsRestored.then(() => {
           for (const tab of gBrowser.tabs) {
             if (isPinnedish(tab)) {
               ensureHome(tab);
