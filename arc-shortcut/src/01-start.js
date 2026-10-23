@@ -147,6 +147,16 @@ try {
       }
     }, "sessionstore-state-finalized");
 
+    // Popup windows (an add-on's, like iCloud Passwords' code window, or a
+    // page's) stay plain Firefox windows: none of this, and userChrome.css
+    // leaves them alone ([popup-window]). Above all they close when their
+    // page closes itself, instead of being kept open on the empty page.
+    const isPopupWindow = win => {
+      const root = win.document?.documentElement;
+      return win.toolbar?.visible === false ||
+        ["popup-window", "web-extension-popup-window", "chromeless-window"].some(a => root?.hasAttribute(a));
+    };
+
     // A starting window's tab list stays hidden ([arc-starting]) until its
     // tiles, rows, folders and start page are in place, then fades in:
     // otherwise they popped in one by one (a stray "New Tab" row, blank
@@ -154,7 +164,7 @@ try {
     // cleared by the window's own set-up below, or after 4s whatever happens.
     obs.addObserver(win => {
       try {
-        if (win.toolbar?.visible === false) {
+        if (isPopupWindow(win)) {
           return;
         }
         styleSidebarMain(win.document);
@@ -204,6 +214,9 @@ try {
     }
 
     obs.addObserver(win => {
+      if (isPopupWindow(win)) {
+        return;
+      }
       const doc = win.document;
       // Each feature sets itself up on its own: if a Firefox update breaks
       // one (a renamed element or function), only that feature is missing,

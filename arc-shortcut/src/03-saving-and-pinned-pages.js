@@ -285,7 +285,7 @@
       // builds it from the shared list when it opens. A window saves only once
       // it has (an earlier save would drop whatever isn't there yet), and not
       // while it's following another window's change.
-      const firstWindow = [...win.Services.wm.getEnumerator("navigator:browser")].length === 1;
+      const firstWindow = [...win.Services.wm.getEnumerator("navigator:browser")].filter(w => !isPopupWindow(w)).length === 1;
       let rowsRestored = false;
       let syncing = false;
       let writing = false; // this window is saving: not a change to follow

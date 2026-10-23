@@ -7,7 +7,7 @@
       patch("tabs slide shut", gBrowser, "_endRemoveTab", slideShutBeforeRemoving);
       patch("closing a pinned row or tile resets it", gBrowser, "removeTab", resetInsteadOfClosing);
       patch("deleting a folder closes its tabs", gBrowser, "removeTabGroup", folderTabsReallyClose);
-      patch("Cmd+W on a tile", win.BrowserCommands, "closeTabOrWindow", closeTilesToo);
+      patch("Cmd+W on a tile or the empty page", win.BrowserCommands, "closeTabOrWindow", closeTilesToo);
       patch("split view: in the row's spot", gBrowser, "addTabSplitView", splitView.inRowSpot);
       patch("split view: a row joining", gBrowser, "moveTabToSplitView", splitView.rowJoins);
       patch("split view: separating glides", splitClass?.prototype, "unsplitTabs", glideApart);

@@ -826,6 +826,23 @@ sidebar-main {
   overflow: clip !important;
 }
 
+/* ---------- Popup windows ----------
+   An add-on's or a page's popup window (iCloud Passwords' code window, a
+   sign-in window, ...) stays a plain Firefox window: the page fills it, no
+   card, no sidebar. (The script leaves these windows alone too.) */
+:root[popup-window] #tabbrowser-tabbox {
+  margin: 0 !important;
+}
+
+:root[popup-window] :is(#tabbrowser-tabpanels, .browserStack, .browserStack > browser, .browserSidebarContainer) {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[popup-window] :is(#sidebar-main, #sidebar-container) {
+  display: none !important;
+}
+
 /* ---------- Sidebar panels (History, Bookmarks, Customize sidebar, ...) ----------
    The panel sits between the sidebar and the page as a card like the page */
 #sidebar-box {
@@ -1595,12 +1612,12 @@ panel toolbarseparator {
   to   { opacity: 1; }
 }
 
-:root:not([arc-script]) #vertical-tabs {
+:root:not([arc-script], [popup-window]) #vertical-tabs {
   position: relative !important;
 }
 
 /* at the bottom of the tab list, above the sidebar's bottom buttons */
-:root:not([arc-script]) #vertical-tabs::after {
+:root:not([arc-script], [popup-window]) #vertical-tabs::after {
   content: "The Arc script isn't running. Run arc-shortcut/install.sh, then restart Firefox.";
   position: absolute;
   inset-inline: var(--arc-sidebar-inset);

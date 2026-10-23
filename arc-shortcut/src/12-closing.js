@@ -61,10 +61,10 @@
       const resetInsteadOfClosing = original => {
         const removeTab = (tab, options) => original.call(gBrowser, tab, options);
         closeOrReset = (tab, options) => {
-          // The empty page (no tab open) has nothing to close: Cmd+W there would
-          // let Firefox go to the tab next to it, often an unloaded pinned
-          // row, and load it. It stays (the script removes it itself once
-          // another tab is selected, while it's no longer the selected one).
+          // The empty page (no tab open) isn't closed like a tab: Firefox would
+          // go to the tab next to it, often an unloaded pinned row, and load
+          // it. It stays (the script removes it itself once another tab is
+          // selected); Cmd+W on it closes the window instead (see below).
           if (tab?.selected && tab.hasAttribute("arc-start-page")) {
             gBrowser.selectedBrowser.focus(); // closes the floating URL bar
             return undefined;
@@ -113,8 +113,14 @@
 
       // Cmd+W on a tile: Firefox never closes a tile from the keyboard (it
       // just jumps to the first unpinned tab); here it closes like a pinned
-      // row does (reset, unloaded) and goes where nextAfterClose says
+      // row does (reset, unloaded) and goes where nextAfterClose says.
+      // Cmd+W on the empty page (no tab open) closes the window, as in Arc
+      // and other Mac apps.
       const closeTilesToo = original => function (event) {
+        if (!gBrowser.multiSelectedTabsCount && gBrowser.selectedTab.hasAttribute("arc-start-page")) {
+          win.BrowserCommands.tryToCloseWindow(event);
+          return undefined;
+        }
         if (!gBrowser.multiSelectedTabsCount && gBrowser.selectedTab.pinned) {
           gBrowser.removeTab(gBrowser.selectedTab);
           return undefined;

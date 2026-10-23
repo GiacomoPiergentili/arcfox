@@ -606,6 +606,31 @@ check(tiles().map(t => t.label).join() === before.map(t => t.label).join(), "(ti
 return result({});
 """),
 
+    ("popup windows stay plain, and close when their page does", r"""
+// a window as an add-on's windows.create({type: "popup"}) makes it (iCloud
+// Passwords' code window)
+const args = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
+const url = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString); url.data = "about:blank"; args.appendElement(url);
+const extra = Cc["@mozilla.org/hash-property-bag;1"].createInstance(Ci.nsIWritablePropertyBag2);
+extra.setPropertyAsBool("web-extension-popup-window", true);
+args.appendElement(extra);
+for (let i = 0; i < 4; i++) args.appendElement(null);
+args.appendElement(P); args.appendElement(P); args.appendElement(P);
+args.appendElement(Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool));
+args.appendElement(null);
+const pw = Services.ww.openWindow(null, AppConstants.BROWSER_CHROME_URL, "_blank", "chrome,dialog,resizable,minimizable,titlebar,close,centerscreen,outerWidth=500,outerHeight=300", args);
+await new Promise(k => pw.addEventListener("load", k, {once: true})); await wait(2500);
+const proot = pw.document.documentElement;
+check(proot.hasAttribute("popup-window"), "(Firefox marks it as a popup)");
+check(!proot.hasAttribute("arc-script") && !pw.document.getElementById("arc-sidebar-button"), "the script leaves it alone");
+check(pw.getComputedStyle(pw.document.getElementById("tabbrowser-tabbox")).marginTop === "0px", "no page card: the page fills the window");
+// what the add-on does once the code is in: its page closes itself
+pw.gBrowser.removeTab(pw.gBrowser.selectedTab); await wait(1500);
+check(pw.closed, "the window closes with its page");
+if (!pw.closed) pw.close();
+return result({});
+"""),
+
     ("no tab previews while dragging", r"""
 // (Firefox makes the preview panel on the first hover; the script hooks in then)
 gBrowser.tabContainer.ensureTabPreviewPanelLoaded();
@@ -775,8 +800,11 @@ check(near(nt.y - url.b, 16, 1), "+ New Tab 16px under the URL bar, as tiles wou
 document.getElementById("key_close").doCommand(); await wait(1500);
 check(!window.closed && gBrowser.tabs.length === 1 && gBrowser.selectedTab.hasAttribute("arc-start-page"), "Cmd+W on the only tab leaves the empty page (the window stays): " + gBrowser.tabs.map(x => x.label).join(", "));
 check(barOpen(), "...with the command bar");
-document.getElementById("key_close").doCommand(); await wait(1000);
-check(!window.closed && gBrowser.tabs.length === 1 && gBrowser.selectedTab.hasAttribute("arc-start-page"), "Cmd+W on the empty page does nothing");
+// (in a second window: Cmd+W on the empty page closes the window)
+const w2 = OpenBrowserWindow(); await new Promise(k => w2.addEventListener("load", k, {once: true})); await wait(2500);
+check(w2.gBrowser.selectedTab.hasAttribute("arc-start-page"), "a new window starts on the empty page");
+w2.document.getElementById("key_close").doCommand(); await wait(1500);
+check(w2.closed, "Cmd+W on the empty page closes the window");
 return result({});
 """),
 
